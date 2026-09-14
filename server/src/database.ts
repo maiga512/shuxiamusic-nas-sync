@@ -22,8 +22,40 @@ const FAVORITES_TITLE = '我的喜欢';
 const FAVORITES_STABLE_LOCAL_ID = 'system:favorites';
 const FAVORITES_TITLE_ALIASES = new Set(['我的喜欢', '我的收藏']);
 const ALLOWED_CLOUD_SONG_SOURCES = new Set(['wy', 'tx', 'kg', 'kw', 'mg', 'bd', 'git', 'plugin']);
+const BRIDGED_PROVIDER_KEYS = new Set(['feiniu', '飞牛音乐', 'fnos']);
+const BRIDGED_STABLE_ID_PREFIXES = ['provider:feiniu:', 'provider:飞牛音乐:', 'provider:fnos:'];
 
 const isFavoritesTitle = (title?: string | null) => !!title && FAVORITES_TITLE_ALIASES.has(title.trim());
+const normalizeProviderKey = (value: unknown) =>
+  String(value || '')
+    .trim()
+    .normalize('NFKC')
+    .toLowerCase();
+const isBridgedProvider = (value: unknown) => BRIDGED_PROVIDER_KEYS.has(normalizeProviderKey(value));
+const isBridgedTitle = (value: unknown) => {
+  const normalized = normalizeProviderKey(value);
+  return normalized.includes('飞牛') || normalized.includes('fnos') || BRIDGED_PROVIDER_KEYS.has(normalized);
+};
+const isBridgedIdentifier = (value: unknown) => {
+  const normalized = normalizeProviderKey(value);
+  return Boolean(
+    normalized &&
+      (BRIDGED_PROVIDER_KEYS.has(normalized) ||
+        BRIDGED_STABLE_ID_PREFIXES.some((prefix) => normalized.startsWith(prefix))),
+  );
+};
+const isBridgedPlaylistInput = (input: {
+  source?: string;
+  sourcePlaylistId?: string;
+  localId?: string;
+  title?: string;
+  name?: string;
+}) =>
+  isBridgedProvider(input.source) ||
+  isBridgedIdentifier(input.sourcePlaylistId) ||
+  isBridgedIdentifier(input.localId) ||
+  isBridgedTitle(input.title) ||
+  isBridgedTitle(input.name);
 const normalizePlaylistSongs = (songs: UnknownRecord[]) =>
   songs
     .map(normalizeSong)
@@ -88,6 +120,12 @@ type PlaylistRow = {
   created_at: string;
   updated_at: string;
 };
+
+const isBridgedPlaylistRow = (row: PlaylistRow) =>
+  isBridgedProvider(row.source) ||
+  isBridgedIdentifier(row.source_playlist_id) ||
+  isBridgedIdentifier(row.local_id) ||
+  isBridgedTitle(row.title);
 
 type PlaylistSongRow = {
   id: string;
@@ -225,6 +263,7 @@ export class SyncDatabase {
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.initSchema();
+    this.removeBridgedPlaylists();
   }
 
   close() {
@@ -466,7 +505,9 @@ export class SyncDatabase {
     const count = this.db.prepare(
       `SELECT COUNT(*) AS total FROM playlist_songs WHERE user_id = ? AND playlist_id = ? AND deleted_at IS NULL`,
     );
-    return rows.map((row) => toPlaylist(row, Number((count.get(userId, row.id) as {total: number}).total || 0)));
+    return rows
+      .filter((row) => !isBridgedPlaylistRow(row))
+      .map((row) => toPlaylist(row, Number((count.get(userId, row.id) as {total: number}).total || 0)));
   }
 
   getPlaylistSongs(userId: string, playlistId: string, sort: 'asc' | 'desc' = 'asc', limit?: number, pos?: number) {
@@ -496,6 +537,16 @@ export class SyncDatabase {
   createPlaylist(userId: string, input: PlaylistInput) {
     const previewLocalId = getText(input.localId) || null;
     const previewTitle = getText(input.title) || getText(input.name) || '未命名歌单';
+    if (isBridgedPlaylistInput({...input, localId: previewLocalId || undefined, title: previewTitle})) {
+      return {
+        id: '',
+        name: previewTitle,
+        title: previewTitle,
+        skipped: true,
+        reason: 'bridged-playlist-excluded',
+        revision: this.getCurrentRevision(userId),
+      };
+    }
     if (resolveSemanticType(input, previewTitle, previewLocalId) === FAVORITES_SEMANTIC) {
       const aliases = this.listFavoriteAliasPlaylists(userId);
       if (aliases.length > 1) {
@@ -561,6 +612,11 @@ export class SyncDatabase {
   updatePlaylist(userId: string, input: PlaylistPatchInput) {
     const playlistId = getText(input.playlistId) || getText(input.listId) || getText(input.id);
     if (!playlistId) return null;
+    const preview = this.getPlaylistRow(userId, playlistId);
+    if (isBridgedPlaylistInput(input) || (preview && isBridgedPlaylistRow(preview))) {
+      const deleted = this.deletePlaylist(userId, playlistId);
+      return deleted ? {...deleted, skipped: true, reason: 'bridged-playlist-excluded'} : null;
+    }
 
     return this.writeTransaction(userId, (revision, at) => {
       const existing = this.getPlaylistRow(userId, playlistId);
@@ -627,9 +683,25 @@ export class SyncDatabase {
     });
   }
 
+  private removeBridgedPlaylists() {
+    const rows = this.db
+      .prepare(`SELECT * FROM playlists WHERE deleted_at IS NULL`)
+      .all() as PlaylistRow[];
+    for (const row of rows) {
+      if (isBridgedPlaylistRow(row)) {
+        this.deletePlaylist(row.user_id, row.id);
+      }
+    }
+  }
+
   addSongs(userId: string, input: PlaylistSongMutationInput) {
     const playlistId = getText(input.playlistId) || getText(input.listId) || getText(input.id);
     if (!playlistId) return null;
+    const preview = this.getPlaylistRow(userId, playlistId);
+    if (preview && isBridgedPlaylistRow(preview)) {
+      const deleted = this.deletePlaylist(userId, playlistId);
+      return deleted ? {...deleted, skipped: true, reason: 'bridged-playlist-excluded'} : null;
+    }
 
     return this.writeTransaction(userId, (revision, at) => {
       if (!this.getPlaylistRow(userId, playlistId)) return null;
