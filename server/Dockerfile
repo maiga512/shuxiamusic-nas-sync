@@ -6,8 +6,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
-COPY server/package.json ./package.json
-RUN yarn install --production --frozen-lockfile || yarn install --production
+COPY server/package.json server/yarn.lock ./
+RUN yarn install --production --frozen-lockfile --ignore-scripts \
+  && npm rebuild better-sqlite3
 
 COPY server/src ./src
 COPY server/tsconfig.json ./tsconfig.json

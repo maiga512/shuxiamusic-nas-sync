@@ -170,7 +170,7 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
     GET: () => ({status: 'ok', service: 'ceru-nas-sync-server'}),
   },
   '/version': {
-    GET: () => ({name: '@ceru/nas-sync-server', version: '0.1.0'}),
+    GET: () => ({name: '@maiga512/ceru-nas-sync-server', version: '0.2.0'}),
   },
   '/auth/register': {
     POST: async ({body}) => {
@@ -389,7 +389,7 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
     GET: ({request}) => {
       requireAdmin(database, request);
       return {
-        service: {status: 'ok', name: '@ceru/nas-sync-server', version: '0.1.0'},
+        service: {status: 'ok', name: '@maiga512/ceru-nas-sync-server', version: '0.2.0'},
         admin: {username: getAdminUsername(database)},
         users: database.listUserSummaries(),
       };
@@ -432,6 +432,21 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
       const session = requireAuth(auth);
       const sinceRevision = Number(url.searchParams.get('sinceRevision') || 0);
       return database.getSyncEvents(session.user.id, Number.isFinite(sinceRevision) ? sinceRevision : 0);
+    },
+  },
+  '/sync/wait': {
+    GET: ({auth, url}) => {
+      const session = requireAuth(auth);
+      const sinceRevision = Number(url.searchParams.get('sinceRevision') || 0);
+      const timeoutMs = Math.min(
+        25_000,
+        Math.max(0, Number(url.searchParams.get('timeout') || 20_000)),
+      );
+      return database.waitForSyncEvents(
+        session.user.id,
+        Number.isFinite(sinceRevision) ? sinceRevision : 0,
+        Number.isFinite(timeoutMs) ? timeoutMs : 20_000,
+      );
     },
   },
   '/user-songlist': {
@@ -484,6 +499,12 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
   '/favorites': {
     GET: ({auth, url}) => ({items: database.listFavorites(requireAuth(auth).user.id, url.searchParams.get('entityType') || undefined)}),
     POST: ({auth, body}) => database.upsertFavorite(requireAuth(auth).user.id, body),
+    DELETE: ({auth, body, url}) =>
+      database.deleteFavorite(requireAuth(auth).user.id, {
+        entityType: getString(body.entityType || url.searchParams.get('entityType')),
+        entityId: getString(body.entityId || url.searchParams.get('entityId')),
+        playlistId: getString(body.playlistId || url.searchParams.get('playlistId')),
+      }),
   },
 });
 

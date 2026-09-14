@@ -5,13 +5,13 @@
  *
  * @name 多端同步
  * @author maiga512
- * @version 1.0.5
+ * @version 1.0.6
  * @description 连接你自建部署的同步服务器，用于歌单备份与多端同步
  */
 
 const pluginInfo = {
   name: '多端同步',
-  version: '1.0.5',
+  version: '1.0.6',
   author: 'maiga512',
   description: '连接你自建部署的同步服务器，用于歌单备份与多端同步'
 }
@@ -35,11 +35,24 @@ const configSchema = [
     ]
   },
   {
-    key: 'serverUrl',
-    label: '同步服务器地址',
+    key: 'host',
+    label: '服务器主机（只填域名）',
     type: 'text',
     required: true,
-    placeholder: '填写你自建部署的同步服务地址，例如 http://192.168.1.10:31231'
+    placeholder: 'nas.example.com（不要填 http://、https:// 或路径）'
+  },
+  {
+    key: 'port',
+    label: '服务器端口',
+    type: 'number',
+    default: 31231,
+    required: true
+  },
+  {
+    key: 'useHttps',
+    label: 'HTTPS 安全访问',
+    type: 'switch',
+    default: false
   },
   {
     key: 'pairCode',
@@ -50,11 +63,55 @@ const configSchema = [
 ]
 
 function normalizeBaseUrl(serverUrl) {
-  return String(serverUrl || '').trim().replace(/\/+$/, '')
+  const raw = String(serverUrl || '').trim()
+  if (!raw) return ''
+  const match = raw.match(/^(https?):\/\//i)
+  const explicitScheme = match ? match[1].toLowerCase() : ''
+  const rest = match ? raw.slice(match[0].length) : raw
+  const authority = rest.split('/')[0]
+  if (!authority) return ''
+  const path = rest.slice(authority.length).replace(/\/+$/, '')
+  const port = Number((authority.match(/:(\d+)$/) || [])[1] || 0)
+  const scheme = explicitScheme || ((port === 443 || port === 11443) ? 'https' : 'http')
+  return `${scheme}://${authority.toLowerCase()}${path}`
+}
+
+function parseServerUrl(serverUrl) {
+  const raw = String(serverUrl || '').trim()
+  if (!raw) return null
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : 'http://' + raw)
+    return {
+      host: parsed.hostname,
+      port: Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)),
+      useHttps: parsed.protocol === 'https:',
+      path: parsed.pathname.replace(/\/+$/, '')
+    }
+  } catch {
+    return null
+  }
+}
+
+function resolveBaseUrl(config) {
+  if (config && config.host) {
+    const host = String(config.host).trim()
+    const parsedHost = parseServerUrl(host)
+    if (/^https?:\/\//i.test(host) && parsedHost) {
+      return `${parsedHost.useHttps ? 'https' : 'http'}://${parsedHost.host}${parsedHost.port ? ':' + parsedHost.port : ''}${parsedHost.path}`
+    }
+    const scheme = config.useHttps === true ? 'https' : 'http'
+    const port = Number(config.port) > 0 ? Number(config.port) : 31231
+    return `${scheme}://${host.replace(/\/+$/, '')}:${port}`
+  }
+
+  // 向后兼容旧配置：serverUrl 仍然可以直接使用。
+  const legacy = parseServerUrl(config && config.serverUrl)
+  if (!legacy) return ''
+  return `${legacy.useHttps ? 'https' : 'http'}://${legacy.host}${legacy.port ? ':' + legacy.port : ''}${legacy.path}`
 }
 
 async function requestNas(config, endpoint, options) {
-  const baseUrl = normalizeBaseUrl(config.serverUrl)
+  const baseUrl = resolveBaseUrl(config)
   if (!baseUrl) throw new Error('请先填写同步服务器地址')
 
   const opts = options || {}
@@ -107,7 +164,7 @@ async function requestNas(config, endpoint, options) {
 
 async function testConnection(config) {
   try {
-    if (!config.serverUrl) {
+    if (!resolveBaseUrl(config)) {
       return { success: false, message: '请填写服务器地址' }
     }
     if (!config.accessToken) {

@@ -18,7 +18,7 @@ export type CeruCloudSong = {
   position?: number;
 };
 
-export type CeruFavoriteEntityType = 'song' | 'playlist' | 'album' | 'artist' | 'rank';
+export type CeruFavoriteEntityType = 'song' | 'playlist' | 'album' | 'artist' | 'rank' | 'podcast';
 
 export type AuthUser = {
   id: string;
@@ -88,6 +88,8 @@ export type FavoriteInput = {
   filePath?: string;
   ownerName?: string;
   metadata?: UnknownRecord;
+  position?: number;
+  pinned?: boolean;
 };
 
 export type UnknownRecord = Record<string, unknown>;

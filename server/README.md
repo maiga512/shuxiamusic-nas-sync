@@ -205,7 +205,9 @@ plugins/ceru-nas-sync-service.js
 配置插件：
 
 ```text
-服务器地址: http://你的NAS地址:31231
+服务器主机: 你的NAS地址
+服务器端口: 31231
+HTTPS 安全访问: 局域网 HTTP 关闭，HTTPS 反向代理打开
 登录绑定码: Web 管理页面为当前用户生成的 pairCode
 ```
 
@@ -223,12 +225,18 @@ https://music-sync.example.com -> http://127.0.0.1:31231
 
 不要把 `CERU_SYNC_ADMIN_TOKEN` 写进前端或插件。它只用于服务端管理接口。
 
-## 同步轮询
+## 实时同步
 
-桌面端会低频请求：
+前台桌面端使用长轮询等待变更：
+
+```text
+GET /sync/wait?sinceRevision=上次revision&timeout=20000
+```
+
+没有变更时请求会等待，最多等待 `25` 秒；任一设备写入变更后，服务端会立即唤醒等待中的请求。客户端收到事件后再刷新对应歌单或播客收藏，不会每次传输完整歌单。
+
+兼容原有短轮询：
 
 ```text
 GET /sync?sinceRevision=上次revision
 ```
-
-服务端只返回变更事件，不会每次传完整歌单。桌面端收到变更后再刷新歌单列表或当前歌单，因此 CPU、内存和网络压力都很低。
