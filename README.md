@@ -13,6 +13,16 @@ Ceru Music NAS Sync 是的澜音/Ceru Music 自部署多端同步方案，包含
 https://github.com/maiga512/CeruMusic-NAS-Sync
 ```
 
+## 安卓客户端下载
+
+安卓版 APK 统一从这里下载：
+
+```text
+https://github.com/maiga512/shuxiamusic-release/releases/latest
+```
+
+页面会自动指向当前最新版本，并在 GitHub Release 中提供 APK 与更新说明。
+
 Docker 镜像：
 
 ```text
