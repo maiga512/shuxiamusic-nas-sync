@@ -3,20 +3,36 @@ import {dirname} from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import {createId, createPairCode, hashToken, nowIso} from './crypto.ts';
+import {createId, createPairCode, decryptJson, encryptJson, generateDataKey, hashToken, nowIso, sha256Hex} from './crypto.ts';
 import {encodeSongForLegacyClient, getText, normalizeFavoriteEntityType, normalizeSong, parseJsonArray} from './normalize.ts';
+import {
+  MAX_PLUGIN_SCRIPT_BYTES,
+  canonicalizeCapabilityConfig,
+  capabilityIdentityKey,
+  canonicalCapabilityRole,
+  mergeCapabilityConfig,
+  musicSourceIdentityKey,
+} from './pluginIdentity.ts';
 import type {
   AuthUser,
   FavoriteInput,
   PlaylistInput,
   PlaylistPatchInput,
   PlaylistSongMutationInput,
+  PlaylistSongOperationInput,
+  PluginKind,
+  PluginOperationInput,
+  SyncedPlugin,
   RequestContext,
   SyncEvent,
   UnknownRecord,
 } from './types.ts';
 
 const json = (value: unknown) => JSON.stringify(value ?? null);
+const CAPABILITY_SECRET_SETTING = 'capability.secretKey';
+const parseJsonRecord = (value: unknown) => parseJson<UnknownRecord>(value, {});
+const parseStringArray = (value: unknown) =>
+  Array.isArray(value) ? value.map((item) => String(item || '').trim()).filter(Boolean) : [];
 const FAVORITES_SEMANTIC = 'favorites';
 const FAVORITES_TITLE = '我的喜欢';
 const FAVORITES_STABLE_LOCAL_ID = 'system:favorites';
@@ -165,6 +181,58 @@ type SyncEventRow = {
   action: string;
   payload_json: string;
   deleted_at: string | null;
+  created_at: string;
+};
+
+type UserPluginRow = {
+  id: string;
+  user_id: string;
+  kind: PluginKind;
+  identity_key: string;
+  name: string | null;
+  author: string | null;
+  version: string | null;
+  enabled: number;
+  disabled_sources_json: string;
+  content_hash: string | null;
+  config_cipher: string | null;
+  revision: number;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type PluginOperationRow = {
+  operation_id: string;
+  user_id: string;
+  device_id: string;
+  sequence: number;
+  occurred_at_ms: number;
+  identity_key: string;
+  action: string;
+  kind: string;
+  applied: number;
+  changed: number;
+  stale: number;
+  result_json: string;
+  revision: number;
+  created_at: string;
+};
+
+type PlaylistSongOperationRow = {
+  operation_id: string;
+  user_id: string;
+  device_id: string;
+  sequence: number;
+  occurred_at_ms: number;
+  playlist_id: string;
+  action: string;
+  track_key: string;
+  applied: number;
+  changed: number;
+  stale: number;
+  result_json: string;
+  revision: number;
   created_at: string;
 };
 
@@ -653,8 +721,12 @@ export class SyncDatabase {
         )
         .run(next);
 
-      if (input.songlist || input.songs) {
-        this.replacePlaylistSongs(userId, playlistId, parseJsonArray(input.songlist || input.songs), revision, at);
+      const snapshotSongs = parseJsonArray(input.songlist || input.songs);
+      if (
+        (input.songlist || input.songs) &&
+        this.canReplaceFavoriteSongsFromSnapshot(userId, existing, snapshotSongs, input.orderOnly === true)
+      ) {
+        this.replacePlaylistSongs(userId, playlistId, snapshotSongs, revision, at);
       }
 
       const total = this.countSongs(userId, playlistId);
@@ -702,6 +774,16 @@ export class SyncDatabase {
       const deleted = this.deletePlaylist(userId, playlistId);
       return deleted ? {...deleted, skipped: true, reason: 'bridged-playlist-excluded'} : null;
     }
+    if (preview?.semantic_type === FAVORITES_SEMANTIC) {
+      return {
+        id: playlistId,
+        playlistId,
+        skipped: true,
+        reason: 'favorites-require-operation',
+        revision: this.getCurrentRevision(userId),
+        updatedAt: nowIso(),
+      };
+    }
 
     return this.writeTransaction(userId, (revision, at) => {
       if (!this.getPlaylistRow(userId, playlistId)) return null;
@@ -716,6 +798,17 @@ export class SyncDatabase {
   removeSongs(userId: string, input: PlaylistSongMutationInput) {
     const playlistId = getText(input.playlistId) || getText(input.listId) || getText(input.id);
     if (!playlistId) return null;
+    const preview = this.getPlaylistRow(userId, playlistId);
+    if (preview?.semantic_type === FAVORITES_SEMANTIC) {
+      return {
+        id: playlistId,
+        playlistId,
+        skipped: true,
+        reason: 'favorites-require-operation',
+        revision: this.getCurrentRevision(userId),
+        updatedAt: nowIso(),
+      };
+    }
     const ids = [...(input.songIds || []), ...(input.songmids || []), ...(input.trackKeys || [])].map(String).filter(Boolean);
 
     return this.writeTransaction(userId, (revision, at) => {
@@ -738,6 +831,345 @@ export class SyncDatabase {
       this.recordEvent(userId, revision, 'playlistSongs', playlistId, 'delete', {playlistId, songIds: ids}, at, at);
       return {id: playlistId, playlistId, revision, deletedAt: at, updatedAt: at};
     });
+  }
+
+  applySongOperation(userId: string, input: PlaylistSongOperationInput) {
+    const operationId = getText(input.operationId);
+    const deviceId = getText(input.deviceId);
+    const playlistId = getText(input.playlistId);
+    const action = input.action === 'remove' ? 'remove' : input.action === 'add' ? 'add' : null;
+    const sequence = Number(input.sequence);
+    if (!operationId || !deviceId || !playlistId || !action || !Number.isSafeInteger(sequence) || sequence < 1) {
+      const error = new Error('operationId、deviceId、sequence、playlistId、action 必须有效');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+    const requestedOccurredAtMs = Number(input.occurredAtMs);
+    const occurredAtMs = Number.isSafeInteger(requestedOccurredAtMs) && requestedOccurredAtMs > 0
+      ? requestedOccurredAtMs
+      : Date.now();
+
+    const normalizedSong = action === 'add' && input.song && typeof input.song === 'object'
+      ? normalizeSong(input.song)
+      : null;
+    const trackKey = getText(input.trackKey) || normalizedSong?.trackKey || '';
+    if (!trackKey) {
+      const error = new Error('trackKey 不能为空');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+    if (
+      action === 'add' &&
+      (!normalizedSong ||
+        !ALLOWED_CLOUD_SONG_SOURCES.has(normalizedSong.source) ||
+        normalizedSong.trackKey.startsWith('local:'))
+    ) {
+      const error = new Error('只能同步受支持的云端歌曲');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+
+    const result = this.db.transaction(() => {
+      const existingOperation = this.db
+        .prepare(
+          `SELECT * FROM playlist_song_operations
+           WHERE user_id = ? AND operation_id = ?`,
+        )
+        .get(userId, operationId) as PlaylistSongOperationRow | undefined;
+      if (existingOperation) {
+        return parseJson<UnknownRecord>(existingOperation.result_json, {
+          operationId,
+          applied: Boolean(existingOperation.applied),
+          changed: Boolean(existingOperation.changed),
+          stale: Boolean(existingOperation.stale),
+          action: existingOperation.action,
+          trackKey: existingOperation.track_key,
+          removedCount: 0,
+          revision: existingOperation.revision,
+          updatedAt: existingOperation.created_at,
+        });
+      }
+
+      const at = nowIso();
+      const persistResult = (
+        result: Record<string, unknown>,
+        revision: number,
+        applied: boolean,
+        changed: boolean,
+        stale: boolean,
+      ) => {
+        this.db
+          .prepare(
+            `INSERT INTO playlist_song_operations
+             (operation_id, user_id, device_id, sequence, playlist_id, action, track_key,
+              occurred_at_ms, applied, changed, stale, result_json, revision, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            operationId,
+            userId,
+            deviceId,
+            sequence,
+            playlistId,
+            action,
+            trackKey,
+            occurredAtMs,
+            applied ? 1 : 0,
+            changed ? 1 : 0,
+            stale ? 1 : 0,
+            json(result),
+            revision,
+            at,
+          );
+        return result;
+      };
+      const currentRevision = this.getCurrentRevision(userId);
+      const newerOperation = this.db
+        .prepare(
+          `SELECT operation_id
+           FROM playlist_song_operations
+           WHERE user_id = ? AND device_id = ? AND track_key = ? AND sequence > ?
+           LIMIT 1`,
+        )
+        .get(userId, deviceId, trackKey, sequence) as {operation_id: string} | undefined;
+      if (newerOperation) {
+        return persistResult(
+          {
+            operationId,
+            applied: false,
+            changed: false,
+            stale: true,
+            action,
+            trackKey,
+            removedCount: 0,
+            revision: currentRevision,
+            updatedAt: at,
+          },
+          currentRevision,
+          false,
+          false,
+          true,
+        );
+      }
+
+      const latestTrackOperation = this.db
+        .prepare(
+          `SELECT operation_id, device_id, sequence, occurred_at_ms
+           FROM playlist_song_operations
+           WHERE user_id = ? AND playlist_id = ? AND track_key = ?
+           ORDER BY occurred_at_ms DESC, operation_id DESC
+           LIMIT 1`,
+        )
+        .get(userId, playlistId, trackKey) as
+          | {operation_id: string; device_id: string; sequence: number; occurred_at_ms: number}
+          | undefined;
+      const latestSameDevice = latestTrackOperation?.device_id === deviceId;
+      if (
+        latestTrackOperation &&
+        (
+          (latestSameDevice
+            ? sequence <= Number(latestTrackOperation.sequence || 0)
+            : occurredAtMs < Number(latestTrackOperation.occurred_at_ms || 0) ||
+              (
+                occurredAtMs === Number(latestTrackOperation.occurred_at_ms || 0) &&
+                operationId <= latestTrackOperation.operation_id
+              ))
+        )
+      ) {
+        return persistResult(
+          {
+            operationId,
+            applied: false,
+            changed: false,
+            stale: true,
+            action,
+            trackKey,
+            removedCount: 0,
+            revision: currentRevision,
+            updatedAt: at,
+            winningOperationId: latestTrackOperation.operation_id,
+            winningOccurredAtMs: Number(latestTrackOperation.occurred_at_ms || 0),
+          },
+          currentRevision,
+          false,
+          false,
+          true,
+        );
+      }
+
+      if (!this.getPlaylistRow(userId, playlistId)) {
+        const error = new Error('歌单不存在');
+        Object.assign(error, {statusCode: 404});
+        throw error;
+      }
+
+      const currentRows = this.db
+        .prepare(`SELECT * FROM playlist_songs WHERE user_id = ? AND playlist_id = ? AND deleted_at IS NULL`)
+        .all(userId, playlistId) as PlaylistSongRow[];
+
+      if (action === 'remove') {
+        const remove = currentRows.filter((row) => {
+          if (row.track_key === trackKey) return true;
+          const song = parseJson<UnknownRecord>(row.track_json, {});
+          return String(song.id || song.songmid || song.hash || '') === trackKey.substring(trackKey.indexOf(':') + 1);
+        });
+        if (remove.length === 0) {
+          return persistResult(
+            {
+              operationId,
+              applied: false,
+              changed: false,
+              stale: false,
+              action,
+              trackKey,
+              removedCount: 0,
+              revision: currentRevision,
+              updatedAt: at,
+            },
+            currentRevision,
+            false,
+            false,
+            false,
+          );
+        }
+
+        const revision = this.nextRevision(userId);
+        for (const row of remove) {
+          this.db
+            .prepare(`UPDATE playlist_songs SET revision = ?, deleted_at = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+            .run(revision, at, at, row.id, userId);
+        }
+        this.touchPlaylist(userId, playlistId, revision, at);
+        this.recordEvent(
+          userId,
+          revision,
+          'playlistSongs',
+          playlistId,
+          'delete',
+          {
+            playlistId,
+            songIds: remove.map((row) => row.track_key),
+            trackKey,
+            operationId,
+            deviceId,
+            sequence,
+            action,
+            removedCount: remove.length,
+          },
+          at,
+          at,
+        );
+        return persistResult(
+          {
+            operationId,
+            applied: true,
+            changed: true,
+            stale: false,
+            action,
+            trackKey,
+            removedCount: remove.length,
+            revision,
+            updatedAt: at,
+          },
+          revision,
+          true,
+          true,
+          false,
+        );
+      }
+
+      const existing = currentRows.find((row) => row.track_key === trackKey);
+      if (existing) {
+        return persistResult(
+          {
+            operationId,
+            applied: true,
+            changed: false,
+            stale: false,
+            action,
+            trackKey,
+            removedCount: 0,
+            revision: currentRevision,
+            updatedAt: at,
+          },
+          currentRevision,
+          true,
+          false,
+          false,
+        );
+      }
+
+      const revision = this.nextRevision(userId);
+      this.db
+        .prepare(
+          `UPDATE playlist_songs
+           SET sort_order = sort_order + 1
+           WHERE user_id = ? AND playlist_id = ? AND deleted_at IS NULL`,
+        )
+        .run(userId, playlistId);
+      this.insertOrUpdatePlaylistSong({
+        id: createId('trk'),
+        user_id: userId,
+        playlist_id: playlistId,
+        track_key: trackKey,
+        track_json: json({
+          id: normalizedSong!.id,
+          source: normalizedSong!.source,
+          title: normalizedSong!.title,
+          artist: normalizedSong!.artist,
+          album: normalizedSong!.album,
+          albumId: normalizedSong!.albumId,
+          durationText: normalizedSong!.durationText,
+          artworkUrl: normalizedSong!.artworkUrl,
+          qualities: normalizedSong!.qualities,
+          position: 0,
+        }),
+        sort_order: 0,
+        revision,
+        deleted_at: null,
+        created_at: at,
+        updated_at: at,
+      });
+      this.touchPlaylist(userId, playlistId, revision, at);
+      this.recordEvent(
+        userId,
+        revision,
+        'playlistSongs',
+        playlistId,
+        'upsert',
+        {
+          playlistId,
+          songs: [{...normalizedSong!, position: 0}],
+          trackKey,
+          operationId,
+          deviceId,
+          sequence,
+          action,
+          removedCount: 0,
+        },
+        null,
+        at,
+      );
+      return persistResult(
+        {
+          operationId,
+          applied: true,
+          changed: true,
+          stale: false,
+          action,
+          trackKey,
+          removedCount: 0,
+          revision,
+          updatedAt: at,
+        },
+        revision,
+        true,
+        true,
+        false,
+      );
+    })();
+    this.notifySyncWaiters(userId);
+    return result;
   }
 
   listFavorites(userId: string, entityType?: string) {
@@ -838,6 +1270,379 @@ export class SyncDatabase {
       this.recordEvent(userId, revision, 'favorite', row.id, 'delete', {...toFavorite(row), deletedAt: at}, at, at);
       return {id: row.id, playlistId: entityType === 'playlist' ? entityId : undefined, entityId, revision, deletedAt: at, updatedAt: at};
     });
+  }
+
+  getCapabilitySecretKey() {
+    const existing = this.getSetting(CAPABILITY_SECRET_SETTING);
+    if (existing) return existing;
+    const generated = generateDataKey();
+    this.setSetting(CAPABILITY_SECRET_SETTING, generated);
+    return generated;
+  }
+
+  putPluginBlob(script: string) {
+    const value = String(script || '');
+    const byteSize = Buffer.byteLength(value, 'utf8');
+    if (!value.trim()) {
+      const error = new Error('plugin script 不能为空');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+    if (byteSize > MAX_PLUGIN_SCRIPT_BYTES) {
+      const error = new Error('插件脚本不能超过 2MB');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+    const contentHash = sha256Hex(value);
+    this.db
+      .prepare(
+        `INSERT INTO plugin_blobs (content_hash, script, byte_size, created_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(content_hash) DO NOTHING`,
+      )
+      .run(contentHash, value, byteSize, nowIso());
+    return {contentHash, byteSize};
+  }
+
+  getPluginBlob(contentHash: string) {
+    const hash = getText(contentHash);
+    if (!hash) return null;
+    const row = this.db
+      .prepare(`SELECT content_hash, script, byte_size FROM plugin_blobs WHERE content_hash = ?`)
+      .get(hash) as {content_hash: string; script: string; byte_size: number} | undefined;
+    if (!row) return null;
+    return {contentHash: row.content_hash, script: row.script, byteSize: Number(row.byte_size || 0)};
+  }
+
+  listPlugins(userId: string, options: {includeDeleted?: boolean} = {}) {
+    const rows = this.db
+      .prepare(
+        options.includeDeleted
+          ? `SELECT * FROM user_plugins WHERE user_id = ? ORDER BY updated_at ASC`
+          : `SELECT * FROM user_plugins WHERE user_id = ? AND deleted_at IS NULL ORDER BY updated_at ASC`,
+      )
+      .all(userId) as UserPluginRow[];
+    return rows.map((row) => this.toSyncedPlugin(row));
+  }
+
+  applyPluginOperation(userId: string, input: PluginOperationInput) {
+    const operationId = getText(input.operationId);
+    const deviceId = getText(input.deviceId);
+    const sequence = Number(input.sequence);
+    const action = input.action === 'remove' ? 'remove' : input.action === 'upsert' ? 'upsert' : null;
+    if (!operationId || !deviceId || !action || !Number.isSafeInteger(sequence) || sequence < 1) {
+      const error = new Error('operationId、deviceId、sequence、action 必须有效');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+
+    const requestedOccurredAtMs = Number(input.occurredAtMs);
+    const occurredAtMs = Number.isSafeInteger(requestedOccurredAtMs) && requestedOccurredAtMs > 0
+      ? requestedOccurredAtMs
+      : Date.now();
+
+    const kind: PluginKind = input.kind === 'capability' ? 'capability' : 'music-source';
+    const role = kind === 'capability' ? canonicalCapabilityRole(input.role || input.identityKey?.replace(/^capability:/, '')) : '';
+    const identityKey = kind === 'capability'
+      ? capabilityIdentityKey(role)
+      : getText(input.identityKey) || musicSourceIdentityKey(input.name, input.author);
+    if (!identityKey || (kind === 'capability' && !role)) {
+      const error = new Error(kind === 'capability' ? 'capability role 必须有效' : 'identityKey 不能为空');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+    if (kind === 'music-source' && action === 'upsert' && !getText(input.contentHash)) {
+      const error = new Error('music-source 插件必须提供 contentHash');
+      Object.assign(error, {statusCode: 400});
+      throw error;
+    }
+    if (kind === 'music-source' && action === 'upsert') {
+      const blob = this.getPluginBlob(String(input.contentHash || ''));
+      if (!blob) {
+        const error = new Error('请先上传插件脚本');
+        Object.assign(error, {statusCode: 400});
+        throw error;
+      }
+    }
+
+    const result = this.db.transaction(() => {
+      const existingOperation = this.db
+        .prepare(`SELECT * FROM plugin_operations WHERE user_id = ? AND operation_id = ?`)
+        .get(userId, operationId) as PluginOperationRow | undefined;
+      if (existingOperation) {
+        return parseJson<UnknownRecord>(existingOperation.result_json, {
+          operationId,
+          applied: Boolean(existingOperation.applied),
+          changed: Boolean(existingOperation.changed),
+          stale: Boolean(existingOperation.stale),
+          action: existingOperation.action,
+          identityKey: existingOperation.identity_key,
+          revision: existingOperation.revision,
+          updatedAt: existingOperation.created_at,
+        });
+      }
+
+      const at = nowIso();
+      const persistResult = (
+        result: Record<string, unknown>,
+        revision: number,
+        applied: boolean,
+        changed: boolean,
+        stale: boolean,
+      ) => {
+        this.db
+          .prepare(
+            `INSERT INTO plugin_operations
+             (operation_id, user_id, device_id, sequence, occurred_at_ms, identity_key, action, kind,
+              applied, changed, stale, result_json, revision, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            operationId,
+            userId,
+            deviceId,
+            sequence,
+            occurredAtMs,
+            identityKey,
+            action,
+            kind,
+            applied ? 1 : 0,
+            changed ? 1 : 0,
+            stale ? 1 : 0,
+            json(result),
+            revision,
+            at,
+          );
+        return result;
+      };
+
+      const currentRevision = this.getCurrentRevision(userId);
+      const newerOperation = this.db
+        .prepare(
+          `SELECT operation_id
+           FROM plugin_operations
+           WHERE user_id = ? AND device_id = ? AND identity_key = ? AND sequence > ?
+           LIMIT 1`,
+        )
+        .get(userId, deviceId, identityKey, sequence) as {operation_id: string} | undefined;
+      if (newerOperation) {
+        return persistResult(
+          {
+            operationId,
+            applied: false,
+            changed: false,
+            stale: true,
+            action,
+            identityKey,
+            revision: currentRevision,
+            updatedAt: at,
+          },
+          currentRevision,
+          false,
+          false,
+          true,
+        );
+      }
+
+      const latest = this.db
+        .prepare(
+          `SELECT operation_id, device_id, sequence, occurred_at_ms
+           FROM plugin_operations
+           WHERE user_id = ? AND identity_key = ?
+           ORDER BY occurred_at_ms DESC, operation_id DESC
+           LIMIT 1`,
+        )
+        .get(userId, identityKey) as
+          | {operation_id: string; device_id: string; sequence: number; occurred_at_ms: number}
+          | undefined;
+      const latestSameDevice = latest?.device_id === deviceId;
+      if (
+        latest &&
+        (
+          (latestSameDevice
+            ? sequence <= Number(latest.sequence || 0)
+            : occurredAtMs < Number(latest.occurred_at_ms || 0) ||
+              (occurredAtMs === Number(latest.occurred_at_ms || 0) && operationId <= latest.operation_id))
+        )
+      ) {
+        return persistResult(
+          {
+            operationId,
+            applied: false,
+            changed: false,
+            stale: true,
+            action,
+            identityKey,
+            revision: currentRevision,
+            updatedAt: at,
+            winningOperationId: latest.operation_id,
+            winningOccurredAtMs: Number(latest.occurred_at_ms || 0),
+          },
+          currentRevision,
+          false,
+          false,
+          true,
+        );
+      }
+
+      const revision = this.nextRevision(userId);
+      const existing = this.db
+        .prepare(`SELECT * FROM user_plugins WHERE user_id = ? AND identity_key = ?`)
+        .get(userId, identityKey) as UserPluginRow | undefined;
+
+      if (action === 'remove') {
+        if (!existing || existing.deleted_at) {
+          const result = {
+            operationId,
+            applied: false,
+            changed: false,
+            stale: false,
+            action,
+            identityKey,
+            revision,
+            updatedAt: at,
+          };
+          persistResult(result, revision, false, false, false);
+          return result;
+        }
+        this.db
+          .prepare(`UPDATE user_plugins SET revision = ?, deleted_at = ?, updated_at = ? WHERE user_id = ? AND id = ?`)
+          .run(revision, at, at, userId, existing.id);
+        const payload = this.toSyncedPlugin({...existing, revision, deleted_at: at, updated_at: at});
+        this.recordEvent(userId, revision, 'plugin', identityKey, 'delete', payload, at, at);
+        const result = {
+          operationId,
+          applied: true,
+          changed: true,
+          stale: false,
+          action,
+          identityKey,
+          plugin: payload,
+          revision,
+          updatedAt: at,
+        };
+        persistResult(result, revision, true, true, false);
+        return result;
+      }
+
+      const next = this.buildUserPluginRow(userId, existing, {
+        kind,
+        identityKey,
+        role,
+        name: getText(input.name) || (kind === 'capability' ? role : '') || '',
+        author: getText(input.author) || '',
+        version: getText(input.version) || '',
+        enabled: input.enabled !== false,
+        disabledSources: parseStringArray(input.disabledSources),
+        contentHash: kind === 'music-source' ? (getText(input.contentHash) || '') : '',
+        config: kind === 'capability' ? mergeCapabilityConfig(role, this.decryptPluginConfig(existing), input.config) : {},
+        revision,
+        at,
+      });
+      this.db
+        .prepare(
+          `INSERT INTO user_plugins
+           (id, user_id, kind, identity_key, name, author, version, enabled, disabled_sources_json,
+            content_hash, config_cipher, revision, deleted_at, created_at, updated_at)
+           VALUES (@id, @user_id, @kind, @identity_key, @name, @author, @version, @enabled, @disabled_sources_json,
+            @content_hash, @config_cipher, @revision, @deleted_at, @created_at, @updated_at)
+           ON CONFLICT(user_id, identity_key) DO UPDATE SET
+             kind = excluded.kind,
+             name = excluded.name,
+             author = excluded.author,
+             version = excluded.version,
+             enabled = excluded.enabled,
+             disabled_sources_json = excluded.disabled_sources_json,
+             content_hash = excluded.content_hash,
+             config_cipher = excluded.config_cipher,
+             revision = excluded.revision,
+             deleted_at = NULL,
+             updated_at = excluded.updated_at`,
+        )
+        .run(next);
+      const payload = this.toSyncedPlugin(next);
+      this.recordEvent(userId, revision, 'plugin', identityKey, 'upsert', payload, null, at);
+      const result = {
+        operationId,
+        applied: true,
+        changed: true,
+        stale: false,
+        action,
+        identityKey,
+        plugin: payload,
+        revision,
+        updatedAt: at,
+      };
+      persistResult(result, revision, true, true, false);
+      return result;
+    })();
+    this.notifySyncWaiters(userId);
+    return result;
+  }
+
+  private decryptPluginConfig(row?: UserPluginRow | null) {
+    if (!row?.config_cipher) return {};
+    return decryptJson<UnknownRecord>(this.getCapabilitySecretKey(), row.config_cipher, {});
+  }
+
+  private buildUserPluginRow(
+    userId: string,
+    existing: UserPluginRow | undefined,
+    input: {
+      kind: PluginKind;
+      identityKey: string;
+      role: string;
+      name: string;
+      author: string;
+      version: string;
+      enabled: boolean;
+      disabledSources: string[];
+      contentHash: string;
+      config: UnknownRecord;
+      revision: number;
+      at: string;
+    },
+  ): UserPluginRow {
+    const configCipher = input.kind === 'capability'
+      ? encryptJson(this.getCapabilitySecretKey(), canonicalizeCapabilityConfig(input.role, input.config))
+      : null;
+    return {
+      id: existing?.id || createId('plg'),
+      user_id: userId,
+      kind: input.kind,
+      identity_key: input.identityKey,
+      name: input.name || existing?.name || '',
+      author: input.author || existing?.author || '',
+      version: input.version || existing?.version || '',
+      enabled: input.enabled ? 1 : 0,
+      disabled_sources_json: json(input.disabledSources),
+      content_hash: input.contentHash || null,
+      config_cipher: configCipher,
+      revision: input.revision,
+      deleted_at: null,
+      created_at: existing?.created_at || input.at,
+      updated_at: input.at,
+    };
+  }
+
+  private toSyncedPlugin(row: UserPluginRow): SyncedPlugin {
+    const role = row.kind === 'capability' ? canonicalCapabilityRole(row.identity_key.replace(/^capability:/, '')) : undefined;
+    return {
+      identityKey: row.identity_key,
+      kind: row.kind,
+      name: row.name || '',
+      author: row.author || '',
+      version: row.version || '',
+      enabled: Boolean(row.enabled),
+      disabledSources: parseStringArray(parseJson(row.disabled_sources_json, [])),
+      contentHash: row.content_hash || undefined,
+      role: role || undefined,
+      config: row.kind === 'capability' ? this.decryptPluginConfig(row) : undefined,
+      revision: row.revision,
+      deletedAt: row.deleted_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   getSyncEvents(userId: string, sinceRevision: number) {
@@ -992,12 +1797,83 @@ export class SyncDatabase {
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS playlist_song_operations (
+        operation_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL,
+        occurred_at_ms INTEGER NOT NULL DEFAULT 0,
+        playlist_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        track_key TEXT NOT NULL,
+        applied INTEGER NOT NULL,
+        changed INTEGER NOT NULL,
+        stale INTEGER NOT NULL DEFAULT 0,
+        result_json TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(user_id, operation_id),
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_playlists_user_revision ON playlists(user_id, revision);
       CREATE INDEX IF NOT EXISTS idx_playlist_songs_user_revision ON playlist_songs(user_id, revision);
       CREATE INDEX IF NOT EXISTS idx_favorites_user_revision ON favorites(user_id, revision);
       CREATE INDEX IF NOT EXISTS idx_sync_events_user_revision ON sync_events(user_id, revision);
-      CREATE INDEX IF NOT EXISTS idx_pair_codes_hash ON pair_codes(code_hash, expires_at, used_at);
-    `);
+CREATE INDEX IF NOT EXISTS idx_playlist_song_ops_order
+ON playlist_song_operations(user_id, device_id, track_key, sequence);
+CREATE INDEX IF NOT EXISTS idx_pair_codes_hash ON pair_codes(code_hash, expires_at, used_at);
+
+CREATE TABLE IF NOT EXISTS plugin_blobs (
+content_hash TEXT PRIMARY KEY,
+script TEXT NOT NULL,
+byte_size INTEGER NOT NULL,
+created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_plugins (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+kind TEXT NOT NULL,
+identity_key TEXT NOT NULL,
+name TEXT,
+author TEXT,
+version TEXT,
+enabled INTEGER NOT NULL DEFAULT 1,
+disabled_sources_json TEXT NOT NULL DEFAULT '[]',
+content_hash TEXT,
+config_cipher TEXT,
+revision INTEGER NOT NULL,
+deleted_at TEXT,
+created_at TEXT NOT NULL,
+updated_at TEXT NOT NULL,
+UNIQUE(user_id, identity_key),
+FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS plugin_operations (
+operation_id TEXT NOT NULL,
+user_id TEXT NOT NULL,
+device_id TEXT NOT NULL,
+sequence INTEGER NOT NULL,
+occurred_at_ms INTEGER NOT NULL DEFAULT 0,
+identity_key TEXT NOT NULL,
+action TEXT NOT NULL,
+kind TEXT NOT NULL,
+applied INTEGER NOT NULL,
+changed INTEGER NOT NULL,
+stale INTEGER NOT NULL DEFAULT 0,
+result_json TEXT NOT NULL,
+revision INTEGER NOT NULL,
+created_at TEXT NOT NULL,
+PRIMARY KEY(user_id, operation_id),
+FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_plugins_user_revision ON user_plugins(user_id, revision);
+CREATE INDEX IF NOT EXISTS idx_plugin_ops_order
+ON plugin_operations(user_id, device_id, identity_key, sequence);
+`);
 
     this.migrateSchema();
   }
@@ -1007,6 +1883,23 @@ export class SyncDatabase {
     if (!pairColumns.some((column) => column.name === 'code')) {
       this.db.prepare(`ALTER TABLE pair_codes ADD COLUMN code TEXT`).run();
     }
+    const operationColumns = this.db.prepare(`PRAGMA table_info(playlist_song_operations)`).all() as Array<{name: string}>;
+    if (!operationColumns.some((column) => column.name === 'stale')) {
+      this.db.prepare(`ALTER TABLE playlist_song_operations ADD COLUMN stale INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    if (!operationColumns.some((column) => column.name === 'occurred_at_ms')) {
+      this.db.prepare(`ALTER TABLE playlist_song_operations ADD COLUMN occurred_at_ms INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    this.db
+      .prepare(
+        `UPDATE playlist_song_operations
+         SET occurred_at_ms = COALESCE(
+           CAST(strftime('%s', created_at) AS INTEGER) * 1000,
+           CAST(strftime('%s', 'now') AS INTEGER) * 1000
+         )
+         WHERE occurred_at_ms <= 0`,
+      )
+      .run();
     this.coalesceDuplicateIdentityPlaylists();
     this.sanitizePlaylistSongOrder();
     this.ensurePlaylistIdentityIndexes();
@@ -1209,8 +2102,12 @@ export class SyncDatabase {
       )
       .run(next);
 
-    if (input.songlist || input.songs) {
-      this.replacePlaylistSongs(userId, existing.id, parseJsonArray(input.songlist || input.songs), revision, at);
+    const snapshotSongs = parseJsonArray(input.songlist || input.songs);
+    if (
+      (input.songlist || input.songs) &&
+      this.canReplaceFavoriteSongsFromSnapshot(userId, existing, snapshotSongs, input.orderOnly === true)
+    ) {
+      this.replacePlaylistSongs(userId, existing.id, snapshotSongs, revision, at);
     }
 
     const total = this.countSongs(userId, existing.id);
@@ -1360,6 +2257,41 @@ export class SyncDatabase {
       .prepare(`SELECT COUNT(*) AS total FROM playlist_songs WHERE user_id = ? AND playlist_id = ? AND deleted_at IS NULL`)
       .get(userId, playlistId) as {total: number};
     return row.total;
+  }
+
+  private canReplaceFavoriteSongsFromSnapshot(
+    userId: string,
+    playlist: PlaylistRow,
+    songs: UnknownRecord[],
+    orderOnly: boolean,
+  ) {
+    if (playlist.semantic_type !== FAVORITES_SEMANTIC) return true;
+    const nextKeys = new Set(normalizePlaylistSongs(songs).map((song) => song.trackKey));
+    if (orderOnly) {
+      const currentKeys = new Set(
+        (
+          this.db
+            .prepare(
+              `SELECT track_key
+               FROM playlist_songs
+               WHERE user_id = ? AND playlist_id = ? AND deleted_at IS NULL`,
+            )
+            .all(userId, playlist.id) as Array<{track_key: string}>
+        ).map((row) => row.track_key),
+      );
+      return (
+        nextKeys.size === currentKeys.size &&
+        [...nextKeys].every((trackKey) => currentKeys.has(trackKey))
+      );
+    }
+    const operationCount = this.db
+      .prepare(
+        `SELECT COUNT(*) AS total
+         FROM playlist_song_operations
+         WHERE user_id = ? AND playlist_id = ?`,
+      )
+      .get(userId, playlist.id) as {total: number};
+    return Number(operationCount.total || 0) === 0 && this.countSongs(userId, playlist.id) === 0;
   }
 
   private touchPlaylist(userId: string, playlistId: string, revision: number, at: string) {

@@ -52,6 +52,7 @@ export type PlaylistInput = {
   semanticType?: string;
   source?: string;
   sourcePlaylistId?: string;
+  orderOnly?: boolean;
   songs?: UnknownRecord[];
   songlist?: UnknownRecord[] | string;
 };
@@ -71,6 +72,55 @@ export type PlaylistSongMutationInput = {
   songIds?: string[];
   songmids?: string[];
   trackKeys?: string[];
+};
+
+export type PlaylistSongOperationInput = {
+  operationId?: string;
+  deviceId?: string;
+  sequence?: number;
+  occurredAtMs?: number;
+  playlistId?: string;
+  action?: 'add' | 'remove';
+  trackKey?: string;
+  song?: UnknownRecord;
+};
+
+export type PluginKind = 'music-source' | 'capability';
+export type PluginAction = 'upsert' | 'remove';
+
+export type PluginOperationInput = {
+  operationId?: string;
+  deviceId?: string;
+  sequence?: number;
+  occurredAtMs?: number;
+  identityKey?: string;
+  action?: PluginAction;
+  kind?: PluginKind;
+  name?: string;
+  author?: string;
+  version?: string;
+  enabled?: boolean;
+  disabledSources?: string[];
+  contentHash?: string;
+  role?: string;
+  config?: UnknownRecord;
+};
+
+export type SyncedPlugin = {
+  identityKey: string;
+  kind: PluginKind;
+  name: string;
+  author: string;
+  version: string;
+  enabled: boolean;
+  disabledSources: string[];
+  contentHash?: string;
+  role?: string;
+  config?: UnknownRecord;
+  revision: number;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type FavoriteInput = {

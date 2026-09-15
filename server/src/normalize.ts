@@ -114,16 +114,7 @@ export const parseJsonArray = (value: unknown): UnknownRecord[] => {
 
 export const normalizeFavoriteEntityType = (value: unknown): CeruFavoriteEntityType => {
   const text = asOptionalString(value);
-  if (
-    text === 'song' ||
-    text === 'playlist' ||
-    text === 'album' ||
-    text === 'artist' ||
-    text === 'rank' ||
-    text === 'podcast'
-  ) {
-    return text;
-  }
+  if (text === 'song' || text === 'playlist' || text === 'album' || text === 'artist' || text === 'rank' || text === 'podcast') return text;
   return 'playlist';
 };
 
