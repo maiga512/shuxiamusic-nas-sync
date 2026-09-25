@@ -1,11 +1,4 @@
-import type {
-  CeruCloudSong,
-  CeruCloudSongQuality,
-  CeruFavoriteEntityType,
-  CeruMusicSource,
-  NormalizedSong,
-  UnknownRecord,
-} from './types.ts';
+import type {CeruCloudSong, CeruCloudSongQuality, CeruFavoriteEntityType, CeruMusicSource, NormalizedSong, UnknownRecord} from './types.ts';
 
 const asString = (value: unknown, fallback = '') => {
   if (typeof value === 'string') return value;
@@ -27,6 +20,20 @@ const asNumber = (value: unknown) => {
   return undefined;
 };
 
+const formatDurationText = (value: number) => {
+  const milliseconds = value > 0 && value < 1000 ? value * 1000 : value;
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return undefined;
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
+};
+
+const durationTextFrom = (song: UnknownRecord) => {
+  const text = asOptionalString(song.durationText) || asOptionalString(song.interval);
+  if (text) return text;
+  const numeric = asNumber(song.duration) ?? asNumber(song.durationMs);
+  return numeric === undefined ? undefined : formatDurationText(numeric);
+};
+
 const normalizeQualities = (value: unknown): CeruCloudSongQuality[] | undefined => {
   if (!Array.isArray(value)) return undefined;
   const qualities: CeruCloudSongQuality[] = [];
@@ -45,22 +52,34 @@ const normalizeQualities = (value: unknown): CeruCloudSongQuality[] | undefined 
 };
 
 const stableTrackKey = (song: UnknownRecord) => {
-  const source = asOptionalString(song.source) || 'local';
-  const id =
+  const source = (asOptionalString(song.source) || 'local').toLowerCase();
+  let id =
     asOptionalString(song.id) ||
     asOptionalString(song.songmid) ||
     asOptionalString(song.hash) ||
     asOptionalString(song.mid) ||
     asOptionalString(song.name) ||
     asOptionalString(song.title);
+  while (id?.toLowerCase().startsWith(`${source}:`)) id = id.slice(source.length + 1).trim();
 
   return `${source}:${id || JSON.stringify(song)}`;
 };
 
+export const normalizeTrackKey = (value: unknown) => {
+  const raw = asString(value).trim();
+  const separator = raw.indexOf(':');
+  if (separator <= 0) return raw;
+  const source = raw.slice(0, separator).toLowerCase();
+  let id = raw.slice(separator + 1).trim();
+  while (id.toLowerCase().startsWith(`${source}:`)) id = id.slice(source.length + 1).trim();
+  return id ? `${source}:${id}` : '';
+};
+
 export const normalizeSong = (song: UnknownRecord): NormalizedSong => {
   const source = (asOptionalString(song.source) || 'local') as CeruMusicSource;
-  const id =
+  let id =
     asOptionalString(song.id) || asOptionalString(song.songmid) || asOptionalString(song.hash) || stableTrackKey(song);
+  while (id.toLowerCase().startsWith(`${source.toLowerCase()}:`)) id = id.slice(source.length + 1).trim();
 
   return {
     id,
@@ -69,7 +88,7 @@ export const normalizeSong = (song: UnknownRecord): NormalizedSong => {
     artist: asOptionalString(song.artist) || asOptionalString(song.singer) || '未知歌手',
     album: asOptionalString(song.album) || asOptionalString(song.albumName),
     albumId: asOptionalString(song.albumId),
-    durationText: asOptionalString(song.durationText) || asOptionalString(song.interval),
+    durationText: durationTextFrom(song),
     artworkUrl: asOptionalString(song.artworkUrl) || asOptionalString(song.img),
     qualities: normalizeQualities(song.qualities || song.types),
     position: asNumber(song.position ?? song.pos),

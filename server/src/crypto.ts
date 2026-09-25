@@ -8,7 +8,15 @@ export const createId = (prefix: string) => `${prefix}_${randomBytes(16).toStrin
 
 export const createToken = () => randomBytes(32).toString('base64url');
 
-export const createPairCode = () => randomBytes(9).toString('base64url').toUpperCase();
+export const createPairCode = () => {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = randomBytes(12);
+  let code = '';
+  for (let index = 0; index < 12; index += 1) {
+    code += alphabet[bytes[index] % alphabet.length];
+  }
+  return code;
+};
 
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 

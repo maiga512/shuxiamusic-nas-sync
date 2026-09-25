@@ -1,9 +1,8 @@
 services:
   ceru-nas-sync:
-    image: ghcr.io/maiga512/ceru-music-nas-sync:latest
     build:
       context: ..
-      dockerfile: server/Dockerfile
+      dockerfile: nas-sync-server/Dockerfile
     container_name: ceru-nas-sync
     restart: unless-stopped
     environment:

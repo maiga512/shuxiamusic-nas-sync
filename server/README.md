@@ -1,20 +1,6 @@
 # Ceru NAS Sync Server
 
-Ceru Music 的自部署歌单同步服务。它用 SQLite 保存用户、歌单、歌曲和收藏关系，桌面端通过 NAS 同步插件连接它。 现在也会同步音源插件脚本，以及飞牛音乐、多端同步的登录参数。
-
-项目地址：
-
-```text
-https://github.com/maiga512/CeruMusic-NAS-Sync
-```
-
-Docker 镜像：
-
-```text
-ghcr.io/maiga512/ceru-music-nas-sync:latest
-```
-
-镜像支持 `linux/amd64` 和 `linux/arm64`，常见 x86_64 NAS、服务器、软路由和 ARM64 设备都可以部署。
+Ceru Music 的自部署歌单同步服务。它用 SQLite 保存用户、歌单、歌曲和收藏关系，桌面端通过 NAS 同步插件连接它。
 
 ## 目录
 
@@ -53,18 +39,6 @@ cp .env.example .env
 编辑 `.env`，把 `CERU_SYNC_ADMIN_TOKEN` 改成你自己的值。
 
 启动：
-
-```bash
-docker compose up -d
-```
-
-默认会拉取已发布镜像：
-
-```text
-ghcr.io/maiga512/ceru-music-nas-sync:latest
-```
-
-如需在本机重新构建镜像，可以执行：
 
 ```bash
 docker compose up -d --build
@@ -116,7 +90,7 @@ http://你的NAS地址:31231/admin
 
 多用户规则：
 
-- 所有用户共用同一个服务器地址，例如 `http://192.168.5.11:31231`
+- 所有用户共用同一个服务器地址，例如 `http://NAS_IP:31231`
 - 每个用户使用自己的绑定码登录插件
 - 服务端按用户账号隔离数据，用户 1 看不到用户 2、用户 3 的歌单和收藏
 - 每个用户的同步记录、歌单、歌曲、收藏、revision 都是独立保存的
@@ -205,9 +179,7 @@ plugins/ceru-nas-sync-service.js
 配置插件：
 
 ```text
-服务器主机: 你的NAS地址
-服务器端口: 31231
-HTTPS 安全访问: 局域网 HTTP 关闭，HTTPS 反向代理打开
+服务器地址: http://你的NAS地址:31231
 登录绑定码: Web 管理页面为当前用户生成的 pairCode
 ```
 
@@ -225,18 +197,12 @@ https://music-sync.example.com -> http://127.0.0.1:31231
 
 不要把 `CERU_SYNC_ADMIN_TOKEN` 写进前端或插件。它只用于服务端管理接口。
 
-## 实时同步
+## 同步轮询
 
-前台桌面端使用长轮询等待变更：
-
-```text
-GET /sync/wait?sinceRevision=上次revision&timeout=20000
-```
-
-没有变更时请求会等待，最多等待 `25` 秒；任一设备写入变更后，服务端会立即唤醒等待中的请求。客户端收到事件后再刷新对应歌单或播客收藏，不会每次传输完整歌单。
-
-兼容原有短轮询：
+桌面端会低频请求：
 
 ```text
 GET /sync?sinceRevision=上次revision
 ```
+
+服务端只返回变更事件，不会每次传完整歌单。桌面端收到变更后再刷新歌单列表或当前歌单，因此 CPU、内存和网络压力都很低。

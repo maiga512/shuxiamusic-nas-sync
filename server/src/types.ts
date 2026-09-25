@@ -53,6 +53,7 @@ export type PlaylistInput = {
   source?: string;
   sourcePlaylistId?: string;
   orderOnly?: boolean;
+  position?: number;
   songs?: UnknownRecord[];
   songlist?: UnknownRecord[] | string;
 };
@@ -61,6 +62,7 @@ export type PlaylistPatchInput = PlaylistInput & {
   id?: string;
   listId?: string;
   playlistId?: string;
+  baseRevision?: number;
 };
 
 export type PlaylistSongMutationInput = {
@@ -104,6 +106,7 @@ export type PluginOperationInput = {
   contentHash?: string;
   role?: string;
   config?: UnknownRecord;
+  position?: number;
 };
 
 export type SyncedPlugin = {
@@ -117,6 +120,7 @@ export type SyncedPlugin = {
   contentHash?: string;
   role?: string;
   config?: UnknownRecord;
+  position: number;
   revision: number;
   deletedAt: string | null;
   createdAt: string;
@@ -124,6 +128,7 @@ export type SyncedPlugin = {
 };
 
 export type FavoriteInput = {
+  operationId?: string;
   entityType?: CeruFavoriteEntityType;
   entityId?: string;
   playlistId?: string;
@@ -140,6 +145,7 @@ export type FavoriteInput = {
   metadata?: UnknownRecord;
   position?: number;
   pinned?: boolean;
+  occurredAtMs?: number;
 };
 
 export type UnknownRecord = Record<string, unknown>;

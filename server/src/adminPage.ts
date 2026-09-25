@@ -318,6 +318,110 @@ export const renderAdminPage = () => `<!doctype html>
         border-radius: 8px;
       }
 
+      .details-panel {
+        display: none;
+      }
+
+      .details-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgba(4, 7, 5, 0.72);
+      }
+
+      .details-modal[hidden] {
+        display: none;
+      }
+
+      .details-dialog {
+        width: min(980px, 100%);
+        max-height: min(820px, calc(100vh - 48px));
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #171c19;
+        box-shadow: 0 28px 100px rgba(0, 0, 0, 0.5);
+      }
+
+      .details-dialog-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .details-dialog-body {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        padding: 18px 22px 24px;
+        overflow: auto;
+        max-height: calc(min(820px, 100vh - 48px) - 76px);
+      }
+
+      .detail-group {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #101411;
+        overflow: hidden;
+      }
+
+      .detail-group h3 {
+        margin: 0;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      .detail-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .detail-list li {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 8px;
+        padding: 9px 14px;
+        border-bottom: 1px solid rgba(55, 67, 59, 0.55);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .detail-list li:last-child {
+        border-bottom: 0;
+      }
+
+      .detail-index {
+        color: var(--subtle);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .detail-empty {
+        padding: 14px;
+        color: var(--subtle);
+        font-size: 13px;
+      }
+
+      @media (max-width: 700px) {
+        .details-modal {
+          padding: 10px;
+        }
+
+        .details-dialog-body {
+          grid-template-columns: 1fr;
+          padding: 12px;
+        }
+      }
+
       .toast {
         position: fixed;
         right: 20px;
@@ -494,6 +598,19 @@ export const renderAdminPage = () => `<!doctype html>
       </div>
     </main>
 
+    <div id="detailsModal" class="details-modal" hidden>
+      <section class="details-dialog" role="dialog" aria-modal="true" aria-labelledby="detailsTitle">
+        <div class="details-dialog-head">
+          <div>
+            <h2 id="detailsTitle">同步数据详情</h2>
+            <p id="detailsSubtitle" class="hint" style="margin-top: 5px"></p>
+          </div>
+          <button id="closeDetails" type="button">关闭</button>
+        </div>
+        <div id="detailsBody" class="details-dialog-body"></div>
+      </section>
+    </div>
+
     <div id="toast" class="toast"></div>
 
     <script>
@@ -510,6 +627,10 @@ export const renderAdminPage = () => `<!doctype html>
       const usersEmpty = $('usersEmpty');
       const usersBody = $('usersBody');
       const toast = $('toast');
+      const detailsModal = $('detailsModal');
+      const detailsBody = $('detailsBody');
+      const detailsTitle = $('detailsTitle');
+      const detailsSubtitle = $('detailsSubtitle');
 
       $('serverUrl').textContent = location.origin;
 
@@ -625,13 +746,13 @@ export const renderAdminPage = () => `<!doctype html>
             '</div></td>' +
             '<td data-label="操作"><div class="row"><button data-pair="' +
             user.id +
-            '"' +
-            (hasBindingCode ? ' disabled' : '') +
-            '>' +
-            (hasBindingCode ? '已生成' : '生成绑定码') +
+            '">' +
+            (hasBindingCode ? '重新生成' : '生成绑定码') +
             '</button><button data-copy-target="pair-' +
             user.id +
-            '">复制</button><button class="danger" data-delete-user="' +
+            '">复制</button><button data-details="' +
+            user.id +
+            '">查看详情</button><button class="danger" data-delete-user="' +
             user.id +
             '" data-delete-username="' +
             escapeHtml(user.username) +
@@ -795,15 +916,45 @@ export const renderAdminPage = () => `<!doctype html>
           try {
             const data = await request('/admin/pair-codes', {
               method: 'POST',
-              body: JSON.stringify({userId: pairUserId}),
+              body: JSON.stringify({userId: pairUserId, force: Boolean(target.textContent?.includes('重新'))}),
             });
             const box = $('pair-' + pairUserId);
             box.textContent = data.pairCode;
-            target.disabled = true;
-            target.textContent = '已生成';
-            showToast(data.existing ? '绑定码已存在' : '长期绑定码已生成');
+            target.textContent = '重新生成';
+            showToast(data.existing ? '绑定码已存在' : '新绑定码已生成');
           } catch (error) {
             showToast(error.message, true);
+          }
+          return;
+        }
+
+        const detailsUserId = target.dataset.details;
+        if (detailsUserId) {
+          detailsModal.hidden = false;
+          detailsBody.innerHTML = '<div class="detail-empty">正在读取云端详情…</div>';
+          detailsTitle.textContent = '同步数据详情';
+          detailsSubtitle.textContent = '正在读取用户数据';
+          try {
+            const data = await request('/admin/user-details?userId=' + encodeURIComponent(detailsUserId));
+            detailsTitle.textContent = '同步数据详情';
+            detailsSubtitle.textContent = (data.user?.username || detailsUserId) + ' · 只读查看';
+            const group = (title, items, label) => {
+              const values = items || [];
+              const rows = values.map((item, index) => '<li><span class="detail-index">' + (index + 1) + '</span><span>' + label(item) + '</span></li>').join('');
+              return '<section class="detail-group"><h3>' + title + '（' + values.length + '）</h3>' + (rows ? '<ol class="detail-list">' + rows + '</ol>' : '<div class="detail-empty">暂无内容</div>') + '</section>';
+            };
+            const playlists = data.playlists || [];
+            const playlistRows = playlists.map((playlist) => {
+              const songs = playlist.songs || [];
+              return '<li><span class="detail-index">' + (Number(playlist.position || 0) + 1) + '</span><span><strong>' + escapeHtml(playlist.name || playlist.id || '未命名') + '</strong><br><span class="hint">' + songs.length + ' 首歌曲</span></span></li>';
+            }).join('');
+            detailsBody.innerHTML =
+              '<section class="detail-group"><h3>歌单（' + playlists.length + '）</h3>' + (playlistRows ? '<ol class="detail-list">' + playlistRows + '</ol>' : '<div class="detail-empty">暂无歌单</div>') + '</section>' +
+              group('插件', data.plugins, (item) => escapeHtml(item.name || item.identityKey || '未命名插件')) +
+              group('歌曲收藏', data.favorites, (item) => escapeHtml(item.title || item.name || item.entityId || '未命名收藏')) +
+              group('播客收藏', data.podcasts, (item) => escapeHtml(item.title || item.name || item.entityId || '未命名播客'));
+          } catch (error) {
+            detailsBody.innerHTML = '<div class="detail-empty error">' + escapeHtml(error.message || '读取详情失败') + '</div>';
           }
           return;
         }
@@ -855,6 +1006,18 @@ export const renderAdminPage = () => `<!doctype html>
           }
           showToast('已复制');
         }
+      });
+
+      $('closeDetails').addEventListener('click', () => {
+        detailsModal.hidden = true;
+      });
+
+      detailsModal.addEventListener('click', (event) => {
+        if (event.target === detailsModal) detailsModal.hidden = true;
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') detailsModal.hidden = true;
       });
 
       setView('login');

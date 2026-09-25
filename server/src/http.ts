@@ -13,6 +13,7 @@ const ADMIN_PASSWORD_SETTING_KEY = 'admin.passwordHash';
 const ADMIN_USERNAME_SETTING_KEY = 'admin.username';
 const DEFAULT_ADMIN_USERNAME = 'admin';
 const DEFAULT_ADMIN_PASSWORD = 'password';
+const MAX_REQUEST_BODY_BYTES = MAX_PLUGIN_SCRIPT_BYTES + 64 * 1024;
 
 export type ServerConfig = {
   port: number;
@@ -29,18 +30,28 @@ type RouteHandler = (ctx: {
 }) => Promise<unknown> | unknown;
 
 const readBody = async (request: IncomingMessage): Promise<UnknownRecord> => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  if (!chunks.length) return {};
-  const buffer = Buffer.concat(chunks);
-  if (buffer.byteLength > MAX_PLUGIN_SCRIPT_BYTES + 64 * 1024) {
+  const declaredLength = Number(request.headers['content-length'] || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BODY_BYTES) {
     const error = new Error('请求体过大');
     Object.assign(error, {statusCode: 413});
     throw error;
   }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.byteLength;
+    if (totalBytes > MAX_REQUEST_BODY_BYTES) {
+      const error = new Error('请求体过大');
+      Object.assign(error, {statusCode: 413});
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  if (!chunks.length) return {};
+  const buffer = Buffer.concat(chunks);
   const contentType = String(request.headers['content-type'] || '').toLowerCase();
 
   if (contentType.includes('application/json')) {
@@ -105,6 +116,18 @@ const sendHtml = (response: ServerResponse, html: string) => {
     'Cache-Control': 'no-store',
   });
   response.end(html);
+};
+
+const sendSseHeaders = (response: ServerResponse) => {
+  response.writeHead(200, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'X-Accel-Buffering': 'no',
+  });
+  response.flushHeaders?.();
 };
 
 const toPublicAuthUser = (user: AuthUser) => ({
@@ -413,13 +436,31 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
         throw error;
       }
 
-      const pair = database.createPairCode({userId: account.id});
+      const pair = database.createPairCode({userId: account.id, force: body.force === true});
       if (!pair) {
         const error = new Error('创建配对码失败');
         Object.assign(error, {statusCode: 500});
         throw error;
       }
       return {pairCode: pair.code, expiresAt: pair.expiresAt, existing: pair.existing, user: toPublicAuthUser(pair.user)};
+    },
+  },
+  '/admin/user-details': {
+    GET: ({request, url}) => {
+      requireAdmin(database, request);
+      const userId = getString(url.searchParams.get('userId'));
+      if (!userId) {
+        const error = new Error('userId 不能为空');
+        Object.assign(error, {statusCode: 400});
+        throw error;
+      }
+      const details = database.getUserDetails(userId);
+      if (!details) {
+        const error = new Error('用户不存在');
+        Object.assign(error, {statusCode: 404});
+        throw error;
+      }
+      return details;
     },
   },
   '/auth/refresh': {
@@ -437,22 +478,36 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
     GET: ({auth, url}) => {
       const session = requireAuth(auth);
       const sinceRevision = Number(url.searchParams.get('sinceRevision') || 0);
-      return database.getSyncEvents(session.user.id, Number.isFinite(sinceRevision) ? sinceRevision : 0);
+      return database.getSyncEvents(session.user.id, Number.isFinite(sinceRevision) ? sinceRevision : 0, session.tokenHash);
     },
   },
+  '/sync/snapshot': {
+    GET: ({auth}) => database.getSyncSnapshotMarker(requireAuth(auth).user.id),
+  },
   '/sync/wait': {
-    GET: ({auth, url}) => {
+    GET: async ({auth, url, response}) => {
       const session = requireAuth(auth);
       const sinceRevision = Number(url.searchParams.get('sinceRevision') || 0);
       const timeoutMs = Math.min(
-        25_000,
-        Math.max(0, Number(url.searchParams.get('timeout') || 20_000)),
+        8_000,
+        Math.max(0, Number(url.searchParams.get('timeout') || 8_000)),
       );
-      return database.waitForSyncEvents(
-        session.user.id,
-        Number.isFinite(sinceRevision) ? sinceRevision : 0,
-        Number.isFinite(timeoutMs) ? timeoutMs : 20_000,
-      );
+      const abortController = new AbortController();
+      const abortIfDisconnected = () => {
+        if (!response.writableEnded) abortController.abort();
+      };
+      response.once('close', abortIfDisconnected);
+      try {
+        return await database.waitForSyncEvents(
+          session.user.id,
+          Number.isFinite(sinceRevision) ? sinceRevision : 0,
+          Number.isFinite(timeoutMs) ? timeoutMs : 8_000,
+          abortController.signal,
+          session.tokenHash,
+        );
+      } finally {
+        response.off('close', abortIfDisconnected);
+      }
     },
   },
   '/user-songlist': {
@@ -472,6 +527,76 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
   '/playlists': {
     GET: ({auth}) => database.listPlaylists(requireAuth(auth).user.id),
     POST: ({auth, body}) => database.createPlaylist(requireAuth(auth).user.id, body),
+  },
+  '/playlist-reorder': {
+    POST: ({auth, body}) => {
+      const session = requireAuth(auth);
+      const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.map(String) : [];
+      if (orderedIds.length === 0) {
+        const error = new Error('orderedIds 不能为空');
+        Object.assign(error, {statusCode: 400});
+        throw error;
+      }
+      return database.reorderPlaylists(session.user.id, orderedIds, Number.isFinite(Number(body.baseRevision)) ? Number(body.baseRevision) : undefined);
+    },
+  },
+  '/favorite-reorder': {
+    POST: ({auth, body}) => {
+      const session = requireAuth(auth);
+      const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.map(String) : [];
+      const entityType = getString(body.entityType);
+      if (!entityType || orderedIds.length === 0) {
+        const error = new Error('entityType、orderedIds 不能为空');
+        Object.assign(error, {statusCode: 400});
+        throw error;
+      }
+      return database.reorderFavorites(session.user.id, entityType, orderedIds, Number.isFinite(Number(body.baseRevision)) ? Number(body.baseRevision) : undefined);
+    },
+  },
+  '/plugin-reorder': {
+    POST: ({auth, body}) => {
+      const session = requireAuth(auth);
+      const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.map(String) : [];
+      if (orderedIds.length === 0) {
+        const error = new Error('orderedIds 不能为空');
+        Object.assign(error, {statusCode: 400});
+        throw error;
+      }
+      return database.reorderPlugins(session.user.id, orderedIds, Number.isFinite(Number(body.baseRevision)) ? Number(body.baseRevision) : undefined);
+    },
+  },
+  '/sync/register': {
+    POST: ({auth, body}) => {
+      const session = requireAuth(auth);
+      const deviceId = getString(body.deviceId);
+      const deviceName = getString(body.deviceName);
+      const deviceType = getString(body.deviceType);
+      if (!deviceId) {
+        const error = new Error('deviceId 不能为空');
+        Object.assign(error, {statusCode: 400});
+        throw error;
+      }
+      return database.registerDevice(session.user.id, deviceId, deviceName, deviceType);
+    },
+  },
+  '/sync/device-revision': {
+    POST: ({auth, body}) => {
+      const session = requireAuth(auth);
+      const deviceId = getString(body.deviceId);
+      const revision = Number(body.revision);
+      if (!deviceId || !Number.isSafeInteger(revision) || revision < 0) {
+        const error = new Error('deviceId 和 revision 必须有效');
+        Object.assign(error, {statusCode: 400});
+        throw error;
+      }
+      return database.updateDeviceSyncRevision(session.user.id, deviceId, revision);
+    },
+  },
+  '/sync/devices': {
+    GET: ({auth}) => {
+      const session = requireAuth(auth);
+      return database.listDevices(session.user.id);
+    },
   },
   '/user-songlist/list': {
     GET: ({auth, url}) => {
@@ -505,7 +630,7 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
     POST: ({auth, body}) => database.upsertFavorite(requireAuth(auth).user.id, {...body, entityType: 'playlist'}),
     DELETE: ({auth, body, url}) => {
       const playlistId = getBodyOrQueryId(body, url, ['playlistId', 'entityId', 'id']);
-      return database.deleteFavorite(requireAuth(auth).user.id, {entityType: 'playlist', playlistId});
+      return database.deleteFavorite(requireAuth(auth).user.id, {entityType: 'playlist', playlistId, occurredAtMs: Number(body.occurredAtMs) || undefined, operationId: getString(body.operationId)});
     },
   },
   '/favorites': {
@@ -516,10 +641,16 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
         entityType: getString(body.entityType || url.searchParams.get('entityType')),
         entityId: getString(body.entityId || url.searchParams.get('entityId')),
         playlistId: getString(body.playlistId || url.searchParams.get('playlistId')),
+        operationId: getString(body.operationId),
+        occurredAtMs: Number(body.occurredAtMs || url.searchParams.get('occurredAtMs')) || undefined,
       }),
   },
   '/plugins': {
-    GET: ({auth}) => ({items: database.listPlugins(requireAuth(auth).user.id)}),
+    GET: ({auth, url}) => ({
+      items: database.listPlugins(requireAuth(auth).user.id, {
+        includeDeleted: url.searchParams.get('includeDeleted') === 'true',
+      }),
+    }),
   },
   '/plugin-blobs': {
     POST: ({auth, body}) => {
@@ -586,7 +717,12 @@ const handleDynamicRoute = (database: SyncDatabase, dynamic: DynamicRoute | null
   }
 
   if (dynamic.type === 'favoriteDelete' && method === 'DELETE') {
-    return database.deleteFavorite(session.user.id, {entityType: dynamic.entityType, entityId: dynamic.entityId});
+    return database.deleteFavorite(session.user.id, {
+      entityType: dynamic.entityType,
+      entityId: dynamic.entityId,
+      operationId: getString(body.operationId),
+      occurredAtMs: Number(body.occurredAtMs) || undefined,
+    });
   }
 
   if (dynamic.type === 'pluginBlob' && method === 'GET') {
@@ -619,6 +755,49 @@ export const createSyncServer = ({database}: ServerConfig) => {
       return;
     }
 
+    if (url.pathname === '/sync/stream' && method === 'GET') {
+      const token = getBearerToken(request);
+      const auth = token ? database.authenticateBearerToken(token) : null;
+      if (!auth) {
+        sendJson(response, 401, {success: false, error: '请先登录 NAS 同步服务'});
+        return;
+      }
+      sendSseHeaders(response);
+      let cursor = Math.max(0, Math.floor(Number(url.searchParams.get('sinceRevision') || 0)));
+      let closed = false;
+      const abortController = new AbortController();
+      const close = () => {
+        closed = true;
+        abortController.abort();
+      };
+      response.once('close', close);
+      response.write(': ceru-sync stream connected\n\n');
+      try {
+        while (!closed && !response.writableEnded) {
+          const page = await database.waitForSyncEvents(
+            auth.user.id,
+            cursor,
+            25_000,
+            abortController.signal,
+          );
+          if (page.events.length > 0) {
+            cursor = page.nextRevision;
+            response.write(`event: sync\ndata: ${JSON.stringify({revision: cursor})}\n\n`);
+          } else {
+            response.write(': keep-alive\n\n');
+          }
+        }
+      } catch (error) {
+        if (!closed && !response.writableEnded) {
+          response.write(`event: error\ndata: ${JSON.stringify({error: error instanceof Error ? error.message : 'stream error'})}\n\n`);
+        }
+      } finally {
+        response.off('close', close);
+        if (!response.writableEnded) response.end();
+      }
+      return;
+    }
+
     try {
       const token = getBearerToken(request);
       const auth = token ? database.authenticateBearerToken(token) : null;
@@ -641,6 +820,7 @@ export const createSyncServer = ({database}: ServerConfig) => {
         success: false,
         error: error instanceof Error ? error.message : '服务端错误',
         code: String(Number.isFinite(statusCode) ? statusCode : 500),
+        ...(typeof error === 'object' && error && 'conflict' in error ? {conflict: (error as {conflict: unknown}).conflict} : {}),
       });
     }
   });
