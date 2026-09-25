@@ -7,7 +7,11 @@
     "types": ["node"],
     "noEmit": true,
     "strict": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ceru/shared-contract": ["../packages/shared-contract/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "data"]

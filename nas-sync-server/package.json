@@ -1,6 +1,6 @@
 {
   "name": "@maiga512/ceru-nas-sync-server",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": false,
   "type": "module",
   "main": "src/index.ts",
@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@ceru/shared-contract": "file:../packages/shared-contract",
     "better-sqlite3": "^12.9.0"
   },
   "devDependencies": {

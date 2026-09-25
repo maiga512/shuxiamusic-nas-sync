@@ -1,24 +1,4 @@
-export type CeruMusicSource = 'local' | 'wy' | 'tx' | 'kg' | 'kw' | 'mg' | 'bd' | 'git' | 'plugin' | string;
-
-export type CeruCloudSongQuality = {
-  type: string;
-  size?: string;
-};
-
-export type CeruCloudSong = {
-  id: string;
-  source: CeruMusicSource;
-  title: string;
-  artist: string;
-  album?: string;
-  albumId?: string;
-  durationText?: string;
-  artworkUrl?: string;
-  qualities?: CeruCloudSongQuality[];
-  position?: number;
-};
-
-export type CeruFavoriteEntityType = 'song' | 'playlist' | 'album' | 'artist' | 'rank' | 'podcast';
+import type {CeruCloudSong, CeruFavoriteEntityType, CeruMusicSource} from '@ceru/shared-contract';
 
 export type AuthUser = {
   id: string;

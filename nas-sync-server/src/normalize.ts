@@ -1,4 +1,6 @@
-import type {CeruCloudSong, CeruCloudSongQuality, CeruFavoriteEntityType, CeruMusicSource, NormalizedSong, UnknownRecord} from './types.ts';
+import type {CeruCloudSong, CeruCloudSongQuality, CeruFavoriteEntityType, CeruMusicSource} from '@ceru/shared-contract';
+
+import type {NormalizedSong, UnknownRecord} from './types.ts';
 
 const asString = (value: unknown, fallback = '') => {
   if (typeof value === 'string') return value;

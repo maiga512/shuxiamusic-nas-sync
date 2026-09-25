@@ -2,7 +2,7 @@
 
 Ceru Music NAS Sync 是的澜音/Ceru Music 自部署多端同步方案，包含两个部分：
 
-- `server/`：部署在 NAS、服务器、软路由、Docker 面板上的同步服务端。
+- `nas-sync-server/`：部署在 NAS、服务器、软路由、Docker 面板上的同步服务端。
 - `plugins/ceru-nas-sync-service.js`：导入到澜音/Ceru Music 桌面端的服务插件。
 
 它用于把桌面端的歌单、歌单歌曲、收藏关系备份到你自己的 NAS，并支持多台设备通过同一个 NAS 服务进行多端同步。
@@ -49,13 +49,13 @@ ghcr.io/maiga512/ceru-music-nas-sync:latest
 运行时用户、绑定码、歌单、收藏和同步记录保存在你部署机器上的 SQLite 数据库里，默认路径是：
 
 ```text
-server/data/ceru-sync.sqlite
+nas-sync-server/data/ceru-sync.sqlite
 ```
 
 这些运行时数据不会提交到 GitHub。仓库里的 `.dockerignore` 和 `.gitignore` 已经忽略：
 
 ```text
-server/data
+nas-sync-server/data
 *.sqlite
 *.sqlite-*
 .env
@@ -69,7 +69,7 @@ server/data
 
 ```bash
 git clone https://github.com/maiga512/CeruMusic-NAS-Sync.git
-cd CeruMusic-NAS-Sync/server
+cd CeruMusic-NAS-Sync/nas-sync-server
 ```
 
 ### 2. 创建环境变量
