@@ -31,7 +31,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/ceru-music-nas-sync
+          # 同时发布新名（shuxiamusic-nas-sync，文档主用）与旧名（ceru-music-nas-sync，
+          # 兼容既有部署，老用户不改 compose 也能继续 pull 到更新）。两者内容完全一致。
+          images: |
+            ghcr.io/${{ github.repository_owner }}/shuxiamusic-nas-sync
+            ghcr.io/${{ github.repository_owner }}/ceru-music-nas-sync
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
@@ -48,8 +52,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             ${{ steps.meta.outputs.labels }}
-            org.opencontainers.image.title=Ceru Music NAS Sync
-            org.opencontainers.image.description=Self-hosted NAS sync server for Ceru Music playlists and favorites, with x86_64 and ARM64 Docker images.
-            org.opencontainers.image.url=https://github.com/maiga512/CeruMusic-NAS-Sync
-            org.opencontainers.image.source=https://github.com/maiga512/CeruMusic-NAS-Sync
+            org.opencontainers.image.title=树夏Music NAS Sync
+            org.opencontainers.image.description=Self-hosted NAS sync server for 树夏Music playlists and favorites, with x86_64 and ARM64 Docker images.
+            org.opencontainers.image.url=https://github.com/maiga512/shuxiamusic-nas-sync
+            org.opencontainers.image.source=https://github.com/maiga512/shuxiamusic-nas-sync
             org.opencontainers.image.vendor=maiga512

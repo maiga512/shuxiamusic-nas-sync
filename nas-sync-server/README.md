@@ -1,6 +1,8 @@
-# Ceru NAS Sync Server
+# 树夏Music 同步服务器（服务端）
 
-Ceru Music 的自部署歌单同步服务。它用 SQLite 保存用户、歌单、歌曲和收藏关系，桌面端通过 NAS 同步插件连接它。
+树夏Music（原 Ceru Music）的自部署歌单同步服务。它用 SQLite 保存用户、歌单、歌曲和收藏关系，桌面端通过 NAS 同步插件连接它。
+
+> 完整部署教程、客户端下载与常见问题见仓库根目录的 [README](../README.md)。
 
 ## 目录
 

@@ -3,17 +3,22 @@
 树夏Music 同步服务器（原名 Ceru Music NAS Sync）是树夏Music 的自部署多端同步方案，包含两个部分：
 
 - `nas-sync-server/`：部署在 NAS、服务器、软路由、Docker 面板上的同步服务端。
-- `plugins/ceru-nas-sync-service.js`：导入到澜音/Ceru Music 桌面端的服务插件。
+- `plugins/ceru-nas-sync-service.js`：导入到树夏Music 桌面端的服务插件。
 
 它用于把桌面端的歌单、歌单歌曲、收藏关系备份到你自己的 NAS，并支持多台设备通过同一个 NAS 服务进行多端同步。
 
-项目地址：
+## 项目地址
 
-```text
-https://github.com/maiga512/CeruMusic-NAS-Sync
-```
+| 平台 | 地址 |
+| --- | --- |
+| GitHub（主仓库） | https://github.com/maiga512/shuxiamusic-nas-sync |
+| Gitee（国内镜像） | https://gitee.com/songsong2020/shuxiamusic-nas-sync |
 
-## 安卓车机音乐客户端下载
+> 国内访问 GitHub 较慢时，可以用 Gitee 镜像克隆、看文档、下载插件脚本。
+
+## 客户端下载
+
+### 安卓 / 车机端
 
 安卓版车机音乐 APK 统一从这里下载：
 
@@ -23,13 +28,27 @@ https://github.com/maiga512/shuxiamusic-release/releases/latest
 
 页面会自动指向当前最新版本，并在 GitHub Release 中提供 APK 与更新说明。
 
-Docker 镜像：
+### Mac 桌面端
+
+Mac 桌面版从桌面发布仓库下载：
 
 ```text
-ghcr.io/maiga512/ceru-music-nas-sync:latest
+https://github.com/maiga512/shuxiamusic-release/releases/tag/desktop-latest
+```
+
+- 首次安装：下载 `.dmg`，拖进「应用程序」即可。
+- 已有旧版：App 内「设置 → 关于 → 检查更新」会自动从 Gitee 拉取（国内更快），连不上再回退 GitHub。
+- 国内镜像（下载更快）：https://gitee.com/songsong2020/shuxiamusic-desktop-release/releases/tag/desktop-latest
+
+## Docker 镜像
+
+```text
+ghcr.io/maiga512/shuxiamusic-nas-sync:latest
 ```
 
 镜像支持 `linux/amd64` 和 `linux/arm64`，也就是常见 x86_64 服务器/NAS 和 ARM64 设备都可以使用。
+
+> 旧镜像名 `ghcr.io/maiga512/ceru-music-nas-sync:latest` 仍然同步发布，老部署无需改动。
 
 ## 功能
 
@@ -68,8 +87,15 @@ nas-sync-server/data
 ### 1. 拉取项目
 
 ```bash
-git clone https://github.com/maiga512/CeruMusic-NAS-Sync.git
-cd CeruMusic-NAS-Sync/nas-sync-server
+git clone https://github.com/maiga512/shuxiamusic-nas-sync.git
+cd shuxiamusic-nas-sync/nas-sync-server
+```
+
+国内网络可用 Gitee 镜像：
+
+```bash
+git clone https://gitee.com/songsong2020/shuxiamusic-nas-sync.git
+cd shuxiamusic-nas-sync/nas-sync-server
 ```
 
 ### 2. 创建环境变量
@@ -100,7 +126,7 @@ docker compose up -d
 默认会使用：
 
 ```text
-ghcr.io/maiga512/ceru-music-nas-sync:latest
+ghcr.io/maiga512/shuxiamusic-nas-sync:latest
 ```
 
 这个镜像已经发布在 GitHub Container Registry，支持：
@@ -135,7 +161,7 @@ curl http://你的NAS地址:31231/health
 通用参数：
 
 ```text
-镜像: ghcr.io/maiga512/ceru-music-nas-sync:latest
+镜像: ghcr.io/maiga512/shuxiamusic-nas-sync:latest
 容器端口: 31231
 宿主机端口: 31231
 数据目录: /data
@@ -151,6 +177,12 @@ curl http://你的NAS地址:31231/health
 ```text
 宿主机目录 /你的路径/ceru-nas-sync/data  ->  容器目录 /data
 ```
+
+各面板的对应位置：
+
+- **群晖 Container Manager**：套件中心安装 → 「注册表」搜 `shuxiamusic-nas-sync` 或直接填完整镜像地址 → 新建容器，映射端口 31231、挂载数据目录到 `/data`。
+- **飞牛 / 绿联 / 铁威马**：Docker 应用 → 添加容器 → 填镜像地址 → 端口与卷同上。
+- **1Panel / 宝塔 / CasaOS / Portainer**：直接用上面「通用参数」建容器，或粘贴 `docker-compose.yml`。
 
 ## Web 管理后台
 
@@ -189,10 +221,16 @@ plugins/ceru-nas-sync-service.js
 GitHub 原始下载地址：
 
 ```text
-https://raw.githubusercontent.com/maiga512/CeruMusic-NAS-Sync/main/plugins/ceru-nas-sync-service.js
+https://raw.githubusercontent.com/maiga512/shuxiamusic-nas-sync/main/plugins/ceru-nas-sync-service.js
 ```
 
-在澜音/Ceru Music 桌面端：
+Gitee 原始下载地址（国内更快）：
+
+```text
+https://gitee.com/songsong2020/shuxiamusic-nas-sync/raw/main/plugins/ceru-nas-sync-service.js
+```
+
+在树夏Music 桌面端：
 
 ```text
 设置 -> 插件 -> 添加插件 -> 澜音插件 -> 本地导入 -> 选择 ceru-nas-sync-service.js
@@ -272,7 +310,7 @@ docker compose exec ceru-nas-sync node src/resetAdmin.ts admin 新的管理员�
 需要 Node.js 22。
 
 ```bash
-cd server
+cd nas-sync-server
 yarn install
 yarn typecheck
 yarn start
