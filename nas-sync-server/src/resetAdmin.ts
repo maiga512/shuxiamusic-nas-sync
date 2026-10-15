@@ -1,4 +1,5 @@
 import {resolve} from 'node:path';
+import {resolveDbPath} from './env.ts';
 
 import {hashPassword, nowIso} from './crypto.ts';
 import {SyncDatabase} from './database.ts';
@@ -11,7 +12,7 @@ if (!password || password.length < 6) {
   process.exit(1);
 }
 
-const dbPath = resolve(process.env.SHUXIA_SYNC_DB_PATH || process.env.SHUXIA_SYNC_DB || './data/shuxia-sync.sqlite');
+const dbPath = resolve(resolveDbPath('./data'));
 const database = new SyncDatabase(dbPath);
 
 database.setSetting('admin.username', username);
