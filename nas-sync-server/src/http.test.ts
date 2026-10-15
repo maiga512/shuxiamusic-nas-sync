@@ -9,7 +9,7 @@ import {createSyncServer} from './http.ts';
 import {MAX_PLUGIN_SCRIPT_BYTES} from './pluginIdentity.ts';
 
 test('oversized request bodies are rejected before reading them into memory', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'ceru-sync-http-test-'));
+  const directory = mkdtempSync(join(tmpdir(), 'shuxia-sync-http-test-'));
   const database = new SyncDatabase(join(directory, 'sync.sqlite'));
   const server = createSyncServer({database, host: '127.0.0.1', port: 0});
 
@@ -37,7 +37,7 @@ test('oversized request bodies are rejected before reading them into memory', as
 });
 
 test('authenticated sync stream wakes on a new server revision', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'ceru-sync-sse-test-'));
+  const directory = mkdtempSync(join(tmpdir(), 'shuxia-sync-sse-test-'));
   const database = new SyncDatabase(join(directory, 'sync.sqlite'));
   const server = createSyncServer({database, host: '127.0.0.1', port: 0});
   try {

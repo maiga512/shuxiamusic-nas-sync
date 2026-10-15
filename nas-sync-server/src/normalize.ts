@@ -1,4 +1,4 @@
-import type {CeruCloudSong, CeruCloudSongQuality, CeruFavoriteEntityType, CeruMusicSource} from '@ceru/shared-contract';
+import type {ShuxiaCloudSong, ShuxiaCloudSongQuality, ShuxiaFavoriteEntityType, ShuxiaMusicSource} from '@shuxia/shared-contract';
 
 import type {NormalizedSong, UnknownRecord} from './types.ts';
 
@@ -36,9 +36,9 @@ const durationTextFrom = (song: UnknownRecord) => {
   return numeric === undefined ? undefined : formatDurationText(numeric);
 };
 
-const normalizeQualities = (value: unknown): CeruCloudSongQuality[] | undefined => {
+const normalizeQualities = (value: unknown): ShuxiaCloudSongQuality[] | undefined => {
   if (!Array.isArray(value)) return undefined;
-  const qualities: CeruCloudSongQuality[] = [];
+  const qualities: ShuxiaCloudSongQuality[] = [];
 
   for (const item of value) {
     if (!item || typeof item !== 'object') continue;
@@ -78,7 +78,7 @@ export const normalizeTrackKey = (value: unknown) => {
 };
 
 export const normalizeSong = (song: UnknownRecord): NormalizedSong => {
-  const source = (asOptionalString(song.source) || 'local') as CeruMusicSource;
+  const source = (asOptionalString(song.source) || 'local') as ShuxiaMusicSource;
   let id =
     asOptionalString(song.id) || asOptionalString(song.songmid) || asOptionalString(song.hash) || stableTrackKey(song);
   while (id.toLowerCase().startsWith(`${source.toLowerCase()}:`)) id = id.slice(source.length + 1).trim();
@@ -99,7 +99,7 @@ export const normalizeSong = (song: UnknownRecord): NormalizedSong => {
   };
 };
 
-export const encodeSongForLegacyClient = (song: CeruCloudSong) => ({
+export const encodeSongForLegacyClient = (song: ShuxiaCloudSong) => ({
   id: song.id,
   songmid: song.id,
   source: song.source,
@@ -133,7 +133,7 @@ export const parseJsonArray = (value: unknown): UnknownRecord[] => {
   }
 };
 
-export const normalizeFavoriteEntityType = (value: unknown): CeruFavoriteEntityType => {
+export const normalizeFavoriteEntityType = (value: unknown): ShuxiaFavoriteEntityType => {
   const text = asOptionalString(value);
   if (text === 'song' || text === 'playlist' || text === 'album' || text === 'artist' || text === 'rank' || text === 'podcast') return text;
   return 'playlist';

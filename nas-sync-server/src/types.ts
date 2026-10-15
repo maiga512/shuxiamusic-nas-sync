@@ -1,4 +1,4 @@
-import type {CeruCloudSong, CeruFavoriteEntityType, CeruMusicSource} from '@ceru/shared-contract';
+import type {ShuxiaCloudSong, ShuxiaFavoriteEntityType, ShuxiaMusicSource} from '@shuxia/shared-contract';
 
 export type AuthUser = {
   id: string;
@@ -109,11 +109,11 @@ export type SyncedPlugin = {
 
 export type FavoriteInput = {
   operationId?: string;
-  entityType?: CeruFavoriteEntityType;
+  entityType?: ShuxiaFavoriteEntityType;
   entityId?: string;
   playlistId?: string;
   sourcePlaylistId?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   title?: string;
   name?: string;
   description?: string;
@@ -140,7 +140,7 @@ export type SyncEvent = {
   createdAt: string;
 };
 
-export type NormalizedSong = CeruCloudSong & {
+export type NormalizedSong = ShuxiaCloudSong & {
   trackKey: string;
   raw: UnknownRecord;
 };

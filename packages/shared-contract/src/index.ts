@@ -1,8 +1,8 @@
-export type CeruMusicSource = 'local' | 'wy' | 'tx' | 'kg' | 'kw' | 'mg' | 'bd' | 'git' | 'plugin';
+export type ShuxiaMusicSource = 'local' | 'wy' | 'tx' | 'kg' | 'kw' | 'mg' | 'bd' | 'git' | 'plugin';
 
-export type CeruTrack = {
+export type ShuxiaTrack = {
   id: string;
-  source: CeruMusicSource;
+  source: ShuxiaMusicSource;
   pluginId?: string;
   title: string;
   artist: string;
@@ -13,39 +13,39 @@ export type CeruTrack = {
   artworkUrl?: string;
   playableUrl?: string;
   quality?: string;
-  qualities?: CeruCloudSongQuality[];
+  qualities?: ShuxiaCloudSongQuality[];
   songInfo?: unknown;
 };
 
-export type CeruPlaybackMode = 'sequence' | 'single' | 'shuffle';
+export type ShuxiaPlaybackMode = 'sequence' | 'single' | 'shuffle';
 
-export type CeruPlaybackStatus = 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'error';
+export type ShuxiaPlaybackStatus = 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'error';
 
-export type CeruPlaybackState = {
-  track: CeruTrack | null;
-  queue: CeruTrack[];
+export type ShuxiaPlaybackState = {
+  track: ShuxiaTrack | null;
+  queue: ShuxiaTrack[];
   queueIndex: number;
-  status: CeruPlaybackStatus;
+  status: ShuxiaPlaybackStatus;
   isPlaying: boolean;
   positionMs: number;
   durationMs: number;
-  mode: CeruPlaybackMode;
-  audioEffects?: CeruAndroidAudioEffectsState;
+  mode: ShuxiaPlaybackMode;
+  audioEffects?: ShuxiaAndroidAudioEffectsState;
   errorMessage?: string;
 };
 
-export type CeruPlaybackCommand =
-  | {type: 'load'; track: CeruTrack}
-  | {type: 'loadQueue'; tracks: CeruTrack[]; startIndex: number}
+export type ShuxiaPlaybackCommand =
+  | {type: 'load'; track: ShuxiaTrack}
+  | {type: 'loadQueue'; tracks: ShuxiaTrack[]; startIndex: number}
   | {type: 'play'}
   | {type: 'pause'}
   | {type: 'seek'; positionMs: number}
   | {type: 'next'}
   | {type: 'previous'}
-  | CeruAndroidPlaybackModeCommand
-  | CeruAndroidAudioEffectsCommand;
+  | ShuxiaAndroidPlaybackModeCommand
+  | ShuxiaAndroidAudioEffectsCommand;
 
-export const emptyPlaybackState: CeruPlaybackState = {
+export const emptyPlaybackState: ShuxiaPlaybackState = {
   track: null,
   queue: [],
   queueIndex: -1,
@@ -56,17 +56,17 @@ export const emptyPlaybackState: CeruPlaybackState = {
   mode: 'sequence',
 };
 
-export type CeruApiResult<T> =
+export type ShuxiaApiResult<T> =
   | {success: true; data: T}
   | {success: false; error: string; code?: string};
 
-export type CeruAuthSession = {
+export type ShuxiaAuthSession = {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: number;
 };
 
-export type CeruUserProfile = {
+export type ShuxiaUserProfile = {
   id: string;
   username?: string;
   nickname?: string;
@@ -78,25 +78,25 @@ export type CeruUserProfile = {
   region?: string;
 };
 
-export type CeruCloudSongQuality = {
+export type ShuxiaCloudSongQuality = {
   type: string;
   size?: string;
 };
 
-export type CeruCloudSong = {
+export type ShuxiaCloudSong = {
   id: string;
-  source: CeruMusicSource;
+  source: ShuxiaMusicSource;
   title: string;
   artist: string;
   album?: string;
   albumId?: string;
   durationText?: string;
   artworkUrl?: string;
-  qualities?: CeruCloudSongQuality[];
+  qualities?: ShuxiaCloudSongQuality[];
   position?: number;
 };
 
-export type CeruCloudPlaylist = {
+export type ShuxiaCloudPlaylist = {
   id: string;
   localId?: string;
   title: string;
@@ -106,13 +106,13 @@ export type CeruCloudPlaylist = {
   total?: number;
 };
 
-export type CeruFavoriteEntityType = 'song' | 'playlist' | 'album' | 'artist' | 'rank' | 'podcast';
+export type ShuxiaFavoriteEntityType = 'song' | 'playlist' | 'album' | 'artist' | 'rank' | 'podcast';
 
-export type CeruPlaylistFavorite = {
+export type ShuxiaPlaylistFavorite = {
   id: string;
   playlistId: string;
   sourcePlaylistId?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   title: string;
   description?: string;
   coverUrl?: string;
@@ -123,10 +123,10 @@ export type CeruPlaylistFavorite = {
   revision?: number;
 };
 
-export type CeruPlaylistFavoriteMutationInput = {
+export type ShuxiaPlaylistFavoriteMutationInput = {
   playlistId: string;
   sourcePlaylistId?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   title: string;
   description?: string;
   coverUrl?: string;
@@ -134,7 +134,7 @@ export type CeruPlaylistFavoriteMutationInput = {
   occurredAtMs?: number;
 };
 
-export type CeruFavoriteMutationResult = {
+export type ShuxiaFavoriteMutationResult = {
   id?: string;
   playlistId?: string;
   entityId?: string;
@@ -143,10 +143,10 @@ export type CeruFavoriteMutationResult = {
   revision?: number;
 };
 
-export type CeruPodcastFavorite = {
+export type ShuxiaPodcastFavorite = {
   id: string;
   radioId: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   title: string;
   description?: string;
   coverUrl?: string;
@@ -161,10 +161,10 @@ export type CeruPodcastFavorite = {
   revision?: number;
 };
 
-export type CeruPodcastFavoriteMutationInput = {
+export type ShuxiaPodcastFavoriteMutationInput = {
   operationId?: string;
   radioId: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   title: string;
   description?: string;
   coverUrl?: string;
@@ -176,68 +176,68 @@ export type CeruPodcastFavoriteMutationInput = {
   occurredAtMs?: number;
 };
 
-export type CeruFavoriteSyncPage<T> = {
+export type ShuxiaFavoriteSyncPage<T> = {
   items: T[];
   revision?: number;
   updatedAt?: string;
 };
 
-export type CeruFavoriteMutationInput = {
-  entityType: CeruFavoriteEntityType;
+export type ShuxiaFavoriteMutationInput = {
+  entityType: ShuxiaFavoriteEntityType;
   entityId: string;
   title?: string;
   description?: string;
   coverUrl?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   metadata?: Record<string, unknown>;
 };
 
-export type CeruCloudPlaylistDetail = CeruCloudPlaylist & {
-  songs: CeruCloudSong[];
+export type ShuxiaCloudPlaylistDetail = ShuxiaCloudPlaylist & {
+  songs: ShuxiaCloudSong[];
 };
 
-export type CeruCloudPlaylistSongsPage = {
-  songs: CeruCloudSong[];
+export type ShuxiaCloudPlaylistSongsPage = {
+  songs: ShuxiaCloudSong[];
   total: number;
 };
 
-export type CeruCreateCloudPlaylistInput = {
+export type ShuxiaCreateCloudPlaylistInput = {
   localId: string;
   title: string;
   description?: string;
   coverUrl?: string;
-  songs: CeruCloudSong[];
+  songs: ShuxiaCloudSong[];
 };
 
-export type CeruUpdateCloudPlaylistInput = {
+export type ShuxiaUpdateCloudPlaylistInput = {
   playlistId: string;
   localId?: string;
   title?: string;
   description?: string;
   coverUrl?: string;
-  songs?: CeruCloudSong[];
+  songs?: ShuxiaCloudSong[];
 };
 
-export type CeruCloudPlaylistMutationResult = {
+export type ShuxiaCloudPlaylistMutationResult = {
   id?: string;
   updatedAt?: string;
 };
 
-export type CeruDeleteCloudPlaylistInput = {
+export type ShuxiaDeleteCloudPlaylistInput = {
   playlistId: string;
 };
 
-export type CeruAddCloudPlaylistSongsInput = {
+export type ShuxiaAddCloudPlaylistSongsInput = {
   playlistId: string;
-  songs: CeruCloudSong[];
+  songs: ShuxiaCloudSong[];
 };
 
-export type CeruRemoveCloudPlaylistSongsInput = {
+export type ShuxiaRemoveCloudPlaylistSongsInput = {
   playlistId: string;
   songIds: string[];
 };
 
-export type CeruCreatePlaylistShareInput = {
+export type ShuxiaCreatePlaylistShareInput = {
   cloudPlaylistId: string;
   allowWebPlayback: boolean;
   ttlDays?: number;
@@ -245,31 +245,31 @@ export type CeruCreatePlaylistShareInput = {
   quality?: string;
 };
 
-export type CeruPlaylistShare = {
+export type ShuxiaPlaylistShare = {
   id: string;
   url: string;
   template?: string;
   playExpiresAt?: number | null;
 };
 
-export type CeruSourceSearchScope = 'song' | 'playlist' | 'album' | 'artist';
+export type ShuxiaSourceSearchScope = 'song' | 'playlist' | 'album' | 'artist';
 
-export type CeruMusicPluginRequestBase = {
+export type ShuxiaMusicPluginRequestBase = {
   pluginId?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   timeoutMs?: number;
 };
 
-export type CeruSourceSearchInput = CeruMusicPluginRequestBase & {
+export type ShuxiaSourceSearchInput = ShuxiaMusicPluginRequestBase & {
   keyword: string;
   page?: number;
   limit?: number;
-  scope?: CeruSourceSearchScope;
+  scope?: ShuxiaSourceSearchScope;
 };
 
-export type CeruSourceSearchItem = {
+export type ShuxiaSourceSearchItem = {
   id: string;
-  source: CeruMusicSource;
+  source: ShuxiaMusicSource;
   pluginId?: string;
   title: string;
   artist?: string;
@@ -278,54 +278,54 @@ export type CeruSourceSearchItem = {
   durationMs?: number;
   durationText?: string;
   artworkUrl?: string;
-  qualities?: CeruCloudSongQuality[];
+  qualities?: ShuxiaCloudSongQuality[];
   songInfo?: unknown;
 };
 
-export type CeruSourceSearchPage = {
-  items: CeruSourceSearchItem[];
+export type ShuxiaSourceSearchPage = {
+  items: ShuxiaSourceSearchItem[];
   total?: number;
   page: number;
   limit: number;
   pluginId?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
 };
 
-export type CeruResolvePlayableUrlInput = CeruMusicPluginRequestBase & {
-  track: CeruTrack;
+export type ShuxiaResolvePlayableUrlInput = ShuxiaMusicPluginRequestBase & {
+  track: ShuxiaTrack;
   quality?: string;
   isCache?: boolean;
 };
 
-export type CeruPlayableUrl = {
+export type ShuxiaPlayableUrl = {
   url: string;
   quality?: string;
   expiresAt?: number;
-  source: CeruMusicSource;
+  source: ShuxiaMusicSource;
   pluginId?: string;
   raw?: unknown;
 };
 
-export type CeruPlayableUrlFailureReason = 'network' | 'decode' | 'timeout' | 'http-status' | 'not-playable' | 'unknown';
+export type ShuxiaPlayableUrlFailureReason = 'network' | 'decode' | 'timeout' | 'http-status' | 'not-playable' | 'unknown';
 
-export type CeruPlayableUrlFailureInput = CeruMusicPluginRequestBase & {
-  track: CeruTrack;
+export type ShuxiaPlayableUrlFailureInput = ShuxiaMusicPluginRequestBase & {
+  track: ShuxiaTrack;
   failedUrl?: string;
   quality?: string;
-  reason: CeruPlayableUrlFailureReason;
+  reason: ShuxiaPlayableUrlFailureReason;
   statusCode?: number;
 };
 
-export type CeruPlaybackResolveInput = CeruMusicPluginRequestBase & {
-  track: CeruTrack;
+export type ShuxiaPlaybackResolveInput = ShuxiaMusicPluginRequestBase & {
+  track: ShuxiaTrack;
   preferredQuality?: string;
   qualityFallbacks?: string[];
   allowCachedUrl?: boolean;
 };
 
-export type CeruPlaybackResolvedCandidate = {
+export type ShuxiaPlaybackResolvedCandidate = {
   quality?: string;
-  source: CeruMusicSource;
+  source: ShuxiaMusicSource;
   pluginId?: string;
   status: 'selected' | 'skipped-failed-url' | 'resolve-failed' | 'empty-url';
   url?: string;
@@ -333,59 +333,59 @@ export type CeruPlaybackResolvedCandidate = {
   error?: string;
 };
 
-export type CeruPlaybackResolveResult = {
-  track: CeruTrack;
-  playableUrl: CeruPlayableUrl;
+export type ShuxiaPlaybackResolveResult = {
+  track: ShuxiaTrack;
+  playableUrl: ShuxiaPlayableUrl;
   selectedQuality?: string;
   fallbackUsed: boolean;
   cacheHit: boolean;
-  candidates: CeruPlaybackResolvedCandidate[];
+  candidates: ShuxiaPlaybackResolvedCandidate[];
 };
 
-export type CeruPlaybackFailureInput = CeruMusicPluginRequestBase & {
-  track: CeruTrack;
+export type ShuxiaPlaybackFailureInput = ShuxiaMusicPluginRequestBase & {
+  track: ShuxiaTrack;
   failedUrl?: string;
   quality?: string;
-  reason: CeruPlayableUrlFailureReason;
+  reason: ShuxiaPlayableUrlFailureReason;
   statusCode?: number;
 };
 
-export type CeruPlaybackFailureResult = {
+export type ShuxiaPlaybackFailureResult = {
   trackId: string;
   failedUrl?: string;
   quality?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   pluginId?: string;
   blockedUntil: number;
 };
 
-export type CeruPlaybackWorkflowBoundary = {
-  resolve: CeruPlaybackResolveInput | null;
-  failure: CeruPlaybackFailureInput | null;
+export type ShuxiaPlaybackWorkflowBoundary = {
+  resolve: ShuxiaPlaybackResolveInput | null;
+  failure: ShuxiaPlaybackFailureInput | null;
   urlCache: 'node-runtime-memory-cache';
   qualityFallback: 'same-plugin-quality-fallback';
 };
 
-export type CeruDownloadTaskStatus = 'queued' | 'preparing' | 'downloading' | 'paused' | 'completed' | 'error' | 'cancelled';
+export type ShuxiaDownloadTaskStatus = 'queued' | 'preparing' | 'downloading' | 'paused' | 'completed' | 'error' | 'cancelled';
 
-export type CeruDownloadDestination = 'android-app-files' | 'android-app-cache';
+export type ShuxiaDownloadDestination = 'android-app-files' | 'android-app-cache';
 
-export type CeruDownloadPrepareInput = CeruPlaybackResolveInput & {
+export type ShuxiaDownloadPrepareInput = ShuxiaPlaybackResolveInput & {
   fileName?: string;
-  destination?: CeruDownloadDestination;
+  destination?: ShuxiaDownloadDestination;
   overwrite?: boolean;
 };
 
-export type CeruDownloadTask = {
+export type ShuxiaDownloadTask = {
   id: string;
-  track: CeruTrack;
+  track: ShuxiaTrack;
   pluginId?: string;
-  source: CeruMusicSource;
+  source: ShuxiaMusicSource;
   quality?: string;
   url: string;
   fileName: string;
-  destination: CeruDownloadDestination;
-  status: CeruDownloadTaskStatus;
+  destination: ShuxiaDownloadDestination;
+  status: ShuxiaDownloadTaskStatus;
   progress: number;
   downloadedSize: number;
   totalSize: number;
@@ -398,18 +398,18 @@ export type CeruDownloadTask = {
   completedAt?: number;
 };
 
-export type CeruDownloadPrepareResult = {
-  task: CeruDownloadTask;
-  playback: CeruPlaybackResolveResult;
+export type ShuxiaDownloadPrepareResult = {
+  task: ShuxiaDownloadTask;
+  playback: ShuxiaPlaybackResolveResult;
 };
 
-export type CeruDownloadTaskList = {
-  tasks: CeruDownloadTask[];
+export type ShuxiaDownloadTaskList = {
+  tasks: ShuxiaDownloadTask[];
 };
 
-export type CeruDownloadTaskUpdateInput = {
+export type ShuxiaDownloadTaskUpdateInput = {
   taskId: string;
-  status: CeruDownloadTaskStatus;
+  status: ShuxiaDownloadTaskStatus;
   progress?: number;
   downloadedSize?: number;
   totalSize?: number;
@@ -419,32 +419,32 @@ export type CeruDownloadTaskUpdateInput = {
   filePath?: string | null;
 };
 
-export type CeruDownloadTaskCommandInput = {
+export type ShuxiaDownloadTaskCommandInput = {
   taskId: string;
 };
 
-export type CeruDownloadWorkflowBoundary = {
-  prepare: CeruDownloadPrepareInput | null;
-  tasks: CeruDownloadTask[];
+export type ShuxiaDownloadWorkflowBoundary = {
+  prepare: ShuxiaDownloadPrepareInput | null;
+  tasks: ShuxiaDownloadTask[];
   persistence: 'node-runtime-json';
   executor: 'android-native-module';
 };
 
-export type CeruAndroidEqualizerBand = {
+export type ShuxiaAndroidEqualizerBand = {
   frequencyHz: number;
   gainDb: number;
 };
 
-export type CeruAndroidSurroundMode = 'off' | 'small' | 'medium' | 'large';
+export type ShuxiaAndroidSurroundMode = 'off' | 'small' | 'medium' | 'large';
 
-export type CeruAndroidLoudnessTarget = 'gentle' | 'standard' | 'strong';
+export type ShuxiaAndroidLoudnessTarget = 'gentle' | 'standard' | 'strong';
 
-export type CeruAndroidAudioEffectsState = {
+export type ShuxiaAndroidAudioEffectsState = {
   enabled: boolean;
   equalizer: {
     enabled: boolean;
     preset: string;
-    bands: CeruAndroidEqualizerBand[];
+    bands: ShuxiaAndroidEqualizerBand[];
   };
   bassBoost: {
     enabled: boolean;
@@ -452,7 +452,7 @@ export type CeruAndroidAudioEffectsState = {
   };
   surround: {
     enabled: boolean;
-    mode: CeruAndroidSurroundMode;
+    mode: ShuxiaAndroidSurroundMode;
   };
   balance: {
     enabled: boolean;
@@ -460,29 +460,29 @@ export type CeruAndroidAudioEffectsState = {
   };
   loudness: {
     enabled: boolean;
-    target: CeruAndroidLoudnessTarget;
+    target: ShuxiaAndroidLoudnessTarget;
   };
 };
 
-export type CeruAndroidAudioEffectsCommand = {
+export type ShuxiaAndroidAudioEffectsCommand = {
   type: 'set-audio-effects';
-  effects: CeruAndroidAudioEffectsState;
+  effects: ShuxiaAndroidAudioEffectsState;
 };
 
-export type CeruAndroidPlaybackModeCommand = {
+export type ShuxiaAndroidPlaybackModeCommand = {
   type: 'set-playback-mode';
-  mode: CeruPlaybackMode;
+  mode: ShuxiaPlaybackMode;
 };
 
-export type CeruAndroidEffectsSystemBoundary = {
-  playbackMode: CeruPlaybackMode;
-  audioEffects: CeruAndroidAudioEffectsState;
+export type ShuxiaAndroidEffectsSystemBoundary = {
+  playbackMode: ShuxiaPlaybackMode;
+  audioEffects: ShuxiaAndroidAudioEffectsState;
   executor: 'android-media3-audio-session';
   systemControls: 'media-session-service';
   externalVerification: 'requires-device-or-emulator';
 };
 
-export const defaultAndroidAudioEffectsState: CeruAndroidAudioEffectsState = {
+export const defaultAndroidAudioEffectsState: ShuxiaAndroidAudioEffectsState = {
   enabled: false,
   equalizer: {
     enabled: false,
@@ -518,7 +518,7 @@ export const defaultAndroidAudioEffectsState: CeruAndroidAudioEffectsState = {
   },
 };
 
-export const emptyAndroidEffectsSystemBoundary: CeruAndroidEffectsSystemBoundary = {
+export const emptyAndroidEffectsSystemBoundary: ShuxiaAndroidEffectsSystemBoundary = {
   playbackMode: 'sequence',
   audioEffects: defaultAndroidAudioEffectsState,
   executor: 'android-media3-audio-session',
@@ -526,46 +526,46 @@ export const emptyAndroidEffectsSystemBoundary: CeruAndroidEffectsSystemBoundary
   externalVerification: 'requires-device-or-emulator',
 };
 
-export type CeruLyricFormat = 'lrc' | 'yrc' | 'qrc' | 'ttml' | 'plain';
+export type ShuxiaLyricFormat = 'lrc' | 'yrc' | 'qrc' | 'ttml' | 'plain';
 
-export type CeruLyricInput = CeruMusicPluginRequestBase & {
-  track: CeruTrack;
+export type ShuxiaLyricInput = ShuxiaMusicPluginRequestBase & {
+  track: ShuxiaTrack;
 };
 
-export type CeruLyricPayload = {
+export type ShuxiaLyricPayload = {
   trackId: string;
-  source: CeruMusicSource;
+  source: ShuxiaMusicSource;
   pluginId?: string;
-  format: CeruLyricFormat;
+  format: ShuxiaLyricFormat;
   lyric: string;
   translation?: string;
   raw?: unknown;
 };
 
-export type CeruArtworkInput = CeruMusicPluginRequestBase & {
-  track: Pick<CeruTrack, 'id' | 'source' | 'pluginId' | 'title' | 'artist' | 'album' | 'albumId' | 'artworkUrl' | 'songInfo'>;
+export type ShuxiaArtworkInput = ShuxiaMusicPluginRequestBase & {
+  track: Pick<ShuxiaTrack, 'id' | 'source' | 'pluginId' | 'title' | 'artist' | 'album' | 'albumId' | 'artworkUrl' | 'songInfo'>;
 };
 
-export type CeruArtworkCacheInput = CeruArtworkInput;
+export type ShuxiaArtworkCacheInput = ShuxiaArtworkInput;
 
-export type CeruArtworkCacheResult = {
+export type ShuxiaArtworkCacheResult = {
   cacheKey: string;
   artworkUrl: string | null;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   pluginId?: string;
   raw?: unknown;
 };
 
-export type CeruSourcePlaylistListInput = CeruMusicPluginRequestBase & {
+export type ShuxiaSourcePlaylistListInput = ShuxiaMusicPluginRequestBase & {
   page?: number;
   limit?: number;
   category?: string;
   tag?: string;
 };
 
-export type CeruSourcePlaylistSummary = {
+export type ShuxiaSourcePlaylistSummary = {
   id: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
   pluginId?: string;
   title: string;
   description?: string;
@@ -575,40 +575,40 @@ export type CeruSourcePlaylistSummary = {
   raw?: unknown;
 };
 
-export type CeruSourcePlaylistPage = {
-  items: CeruSourcePlaylistSummary[];
+export type ShuxiaSourcePlaylistPage = {
+  items: ShuxiaSourcePlaylistSummary[];
   page: number;
   limit: number;
   total?: number;
   pluginId?: string;
-  source?: CeruMusicSource;
+  source?: ShuxiaMusicSource;
 };
 
-export type CeruSourcePlaylistSongsInput = CeruMusicPluginRequestBase & {
+export type ShuxiaSourcePlaylistSongsInput = ShuxiaMusicPluginRequestBase & {
   playlistId: string;
   page?: number;
   limit?: number;
   rawPlaylist?: unknown;
 };
 
-export type CeruSourcePlaylistSongsPage = {
-  playlist: CeruSourcePlaylistSummary;
-  songs: CeruTrack[];
+export type ShuxiaSourcePlaylistSongsPage = {
+  playlist: ShuxiaSourcePlaylistSummary;
+  songs: ShuxiaTrack[];
   page: number;
   limit: number;
   total?: number;
 };
 
-export type CeruAndroidSourceBoundary = {
+export type ShuxiaAndroidSourceBoundary = {
   access: 'backend-aggregation' | 'pending-backend';
   desktopPluginRuntime: 'not-reused-on-android';
-  search: CeruSourceSearchInput | null;
-  playableUrl: CeruPlayableUrl | null;
-  lyric: CeruLyricPayload | null;
-  artworkCache: CeruArtworkCacheResult | null;
+  search: ShuxiaSourceSearchInput | null;
+  playableUrl: ShuxiaPlayableUrl | null;
+  lyric: ShuxiaLyricPayload | null;
+  artworkCache: ShuxiaArtworkCacheResult | null;
 };
 
-export const emptyAndroidSourceBoundary: CeruAndroidSourceBoundary = {
+export const emptyAndroidSourceBoundary: ShuxiaAndroidSourceBoundary = {
   access: 'pending-backend',
   desktopPluginRuntime: 'not-reused-on-android',
   search: null,
@@ -617,38 +617,38 @@ export const emptyAndroidSourceBoundary: CeruAndroidSourceBoundary = {
   artworkCache: null,
 };
 
-export type CeruAndroidLocalAudioScanBoundary = {
+export type ShuxiaAndroidLocalAudioScanBoundary = {
   access: 'media-library-permission-required' | 'not-started';
   supportedSources: Array<'media-store-audio'>;
   resultEntrypoint: 'local-track-list';
 };
 
-export type CeruAndroidLocalCacheBoundary = {
+export type ShuxiaAndroidLocalCacheBoundary = {
   audio: 'app-cache-dir';
   artwork: 'app-cache-dir';
   lyric: 'app-files-dir';
 };
 
-export type CeruAndroidDownloadQueueBoundary = {
+export type ShuxiaAndroidDownloadQueueBoundary = {
   persistence: 'pending-local-store';
   worker: 'pending-background-worker';
   notification: 'pending-system-integration';
 };
 
-export type CeruAndroidFilePermissionBoundary = {
+export type ShuxiaAndroidFilePermissionBoundary = {
   readMediaAudio: 'runtime-permission-android-13-plus';
   readExternalStorage: 'legacy-runtime-permission-android-12-minus';
   writeExternalStorage: 'legacy-scoped-to-android-9-minus';
 };
 
-export type CeruAndroidLocalCapabilitiesBoundary = {
-  localAudioScan: CeruAndroidLocalAudioScanBoundary;
-  cache: CeruAndroidLocalCacheBoundary;
-  downloadQueue: CeruAndroidDownloadQueueBoundary;
-  permissions: CeruAndroidFilePermissionBoundary;
+export type ShuxiaAndroidLocalCapabilitiesBoundary = {
+  localAudioScan: ShuxiaAndroidLocalAudioScanBoundary;
+  cache: ShuxiaAndroidLocalCacheBoundary;
+  downloadQueue: ShuxiaAndroidDownloadQueueBoundary;
+  permissions: ShuxiaAndroidFilePermissionBoundary;
 };
 
-export const emptyAndroidLocalCapabilitiesBoundary: CeruAndroidLocalCapabilitiesBoundary = {
+export const emptyAndroidLocalCapabilitiesBoundary: ShuxiaAndroidLocalCapabilitiesBoundary = {
   localAudioScan: {
     access: 'not-started',
     supportedSources: ['media-store-audio'],
@@ -671,7 +671,7 @@ export const emptyAndroidLocalCapabilitiesBoundary: CeruAndroidLocalCapabilities
   },
 };
 
-export type CeruAndroidSystemIntegrationBoundary = {
+export type ShuxiaAndroidSystemIntegrationBoundary = {
   playbackNotification: 'media-session-service';
   lockscreenControls: 'media-session-metadata';
   mediaKeys: 'media-session-controller';
@@ -680,7 +680,7 @@ export type CeruAndroidSystemIntegrationBoundary = {
   externalVerification: 'requires-device-or-emulator';
 };
 
-export const emptyAndroidSystemIntegrationBoundary: CeruAndroidSystemIntegrationBoundary = {
+export const emptyAndroidSystemIntegrationBoundary: ShuxiaAndroidSystemIntegrationBoundary = {
   playbackNotification: 'media-session-service',
   lockscreenControls: 'media-session-metadata',
   mediaKeys: 'media-session-controller',
@@ -689,7 +689,7 @@ export const emptyAndroidSystemIntegrationBoundary: CeruAndroidSystemIntegration
   externalVerification: 'requires-device-or-emulator',
 };
 
-export type CeruNodeRuntimeDirectoryMap = {
+export type ShuxiaNodeRuntimeDirectoryMap = {
   root: string;
   plugins: string;
   builtinPlugins: string;
@@ -700,23 +700,23 @@ export type CeruNodeRuntimeDirectoryMap = {
   downloadMetadata: string;
 };
 
-export type CeruNodeRuntimeHealth = {
+export type ShuxiaNodeRuntimeHealth = {
   status: 'ok' | 'degraded';
   version: string;
   node: string;
   startedAt: string;
   uptimeMs: number;
-  directories: CeruNodeRuntimeDirectoryMap;
+  directories: ShuxiaNodeRuntimeDirectoryMap;
 };
 
-export type CeruNodeRuntimeVersion = {
-  name: '@ceru/node-runtime';
+export type ShuxiaNodeRuntimeVersion = {
+  name: '@shuxia/node-runtime';
   version: string;
   apiVersion: string;
   node: string;
 };
 
-export type CeruNodeRuntimeEndpointMap = {
+export type ShuxiaNodeRuntimeEndpointMap = {
   health: string;
   version: string;
   plugins: string;
@@ -750,7 +750,7 @@ export type CeruNodeRuntimeEndpointMap = {
   playbackFailure: string;
 };
 
-export const ceruNodeRuntimeEndpoints: CeruNodeRuntimeEndpointMap = {
+export const shuxiaNodeRuntimeEndpoints: ShuxiaNodeRuntimeEndpointMap = {
   health: '/health',
   version: '/version',
   plugins: '/plugins',
@@ -784,13 +784,13 @@ export const ceruNodeRuntimeEndpoints: CeruNodeRuntimeEndpointMap = {
   playbackFailure: '/playback/failure',
 };
 
-export type CeruPluginType = 'music-source' | 'service' | 'lyrics' | 'artwork' | 'unknown';
+export type ShuxiaPluginType = 'music-source' | 'service' | 'lyrics' | 'artwork' | 'unknown';
 
-export type CeruPluginInstallSource = 'local-upload' | 'remote-url' | 'builtin';
+export type ShuxiaPluginInstallSource = 'local-upload' | 'remote-url' | 'builtin';
 
-export type CeruPluginRuntimeStatus = 'not-loaded' | 'initializing' | 'ready' | 'sleeping' | 'throttled' | 'disabled' | 'crashed' | 'error';
+export type ShuxiaPluginRuntimeStatus = 'not-loaded' | 'initializing' | 'ready' | 'sleeping' | 'throttled' | 'disabled' | 'crashed' | 'error';
 
-export type CeruPluginConfigSchemaField = {
+export type ShuxiaPluginConfigSchemaField = {
   key: string;
   label: string;
   type: 'string' | 'number' | 'boolean' | 'password' | 'select';
@@ -800,66 +800,66 @@ export type CeruPluginConfigSchemaField = {
   description?: string;
 };
 
-export type CeruPluginInfo = {
+export type ShuxiaPluginInfo = {
   id: string;
   name: string;
   version?: string;
   author?: string;
   description?: string;
-  type: CeruPluginType;
-  supportedSources: CeruMusicSource[];
+  type: ShuxiaPluginType;
+  supportedSources: ShuxiaMusicSource[];
   disabled: boolean;
-  status: CeruPluginRuntimeStatus;
-  installSource: CeruPluginInstallSource;
-  configSchema?: CeruPluginConfigSchemaField[];
+  status: ShuxiaPluginRuntimeStatus;
+  installSource: ShuxiaPluginInstallSource;
+  configSchema?: ShuxiaPluginConfigSchemaField[];
   installedAt?: string;
   updatedAt?: string;
 };
 
-export type CeruPluginLogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type ShuxiaPluginLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export type CeruPluginLogLine = {
+export type ShuxiaPluginLogLine = {
   id: string;
   pluginId: string;
-  level: CeruPluginLogLevel;
+  level: ShuxiaPluginLogLevel;
   message: string;
   createdAt: string;
   scope?: string;
 };
 
-export type CeruPluginInstallLocalInput = {
+export type ShuxiaPluginInstallLocalInput = {
   fileName: string;
   code: string;
   overwrite?: boolean;
 };
 
-export type CeruPluginInstallUrlInput = {
+export type ShuxiaPluginInstallUrlInput = {
   url: string;
   overwrite?: boolean;
 };
 
-export type CeruPluginInstallBuiltinInput = {
+export type ShuxiaPluginInstallBuiltinInput = {
   fileName: string;
   overwrite?: boolean;
 };
 
-export type CeruBuiltinPluginInfo = {
+export type ShuxiaBuiltinPluginInfo = {
   fileName: string;
   filePath: string;
   checksum: string;
-  plugin: CeruPluginInfo;
+  plugin: ShuxiaPluginInfo;
 };
 
-export type CeruPluginConfig = Record<string, unknown>;
+export type ShuxiaPluginConfig = Record<string, unknown>;
 
-export type CeruPluginMutationResult = {
-  plugin: CeruPluginInfo;
-  logs?: CeruPluginLogLine[];
+export type ShuxiaPluginMutationResult = {
+  plugin: ShuxiaPluginInfo;
+  logs?: ShuxiaPluginLogLine[];
 };
 
-export type CeruPluginHostStatus = CeruPluginRuntimeStatus;
+export type ShuxiaPluginHostStatus = ShuxiaPluginRuntimeStatus;
 
-export type CeruPluginHostMethod =
+export type ShuxiaPluginHostMethod =
   | 'search'
   | 'musicUrl'
   | 'getPic'
@@ -868,74 +868,74 @@ export type CeruPluginHostMethod =
   | 'getPlaylists'
   | 'getPlaylistSongs';
 
-export type CeruPluginHostCallInput = {
+export type ShuxiaPluginHostCallInput = {
   pluginId: string;
-  method: CeruPluginHostMethod;
+  method: ShuxiaPluginHostMethod;
   args?: unknown[];
   timeoutMs?: number;
 };
 
-export type CeruPluginHostCallResult = {
+export type ShuxiaPluginHostCallResult = {
   pluginId: string;
-  method: CeruPluginHostMethod;
+  method: ShuxiaPluginHostMethod;
   data: unknown;
   elapsedMs: number;
-  status: CeruPluginHostStatus;
+  status: ShuxiaPluginHostStatus;
 };
 
-export type CeruPluginHostEventType = 'ready' | 'unloaded' | 'log' | 'notice' | 'throttle' | 'disabled' | 'crashed' | 'config';
+export type ShuxiaPluginHostEventType = 'ready' | 'unloaded' | 'log' | 'notice' | 'throttle' | 'disabled' | 'crashed' | 'config';
 
-export type CeruPluginHostEvent = {
+export type ShuxiaPluginHostEvent = {
   id: string;
   pluginId: string;
-  type: CeruPluginHostEventType;
-  level: CeruPluginLogLevel;
+  type: ShuxiaPluginHostEventType;
+  level: ShuxiaPluginLogLevel;
   message: string;
   createdAt: string;
   payload?: unknown;
 };
 
-export type CeruPluginHostMeta = {
+export type ShuxiaPluginHostMeta = {
   pluginId: string;
-  status: CeruPluginHostStatus;
+  status: ShuxiaPluginHostStatus;
   disabled: boolean;
   disabledReason?: string;
   throttledReason?: string;
   throttledUntil?: string;
   crashCount: number;
-  hasMethods: Partial<Record<CeruPluginHostMethod | 'onConfigUpdate', boolean>>;
-  pluginInfo: CeruPluginInfo;
+  hasMethods: Partial<Record<ShuxiaPluginHostMethod | 'onConfigUpdate', boolean>>;
+  pluginInfo: ShuxiaPluginInfo;
 };
 
-export type CeruPluginHostLoadInput = {
+export type ShuxiaPluginHostLoadInput = {
   pluginId: string;
 };
 
-export type CeruPluginHostDisableInput = {
+export type ShuxiaPluginHostDisableInput = {
   pluginId: string;
   reason?: string;
 };
 
-export type CeruPluginHostEnableInput = {
+export type ShuxiaPluginHostEnableInput = {
   pluginId: string;
 };
 
-export type CeruSourceQualityPreference = {
-  source: CeruMusicSource;
+export type ShuxiaSourceQualityPreference = {
+  source: ShuxiaMusicSource;
   quality: string;
 };
 
-export type CeruSourceSuggestInput = {
+export type ShuxiaSourceSuggestInput = {
   keyword: string;
-  sources?: CeruMusicSource[];
+  sources?: ShuxiaMusicSource[];
   limit?: number;
 };
 
-export type CeruSourceSuggestResult = {
+export type ShuxiaSourceSuggestResult = {
   items: string[];
 };
 
-export type CeruAudioEffectPreset = {
+export type ShuxiaAudioEffectPreset = {
   eq?: number[];
   bassBoost?: number;
   virtualizer?: number;
@@ -945,13 +945,13 @@ export type CeruAudioEffectPreset = {
   replayGain?: boolean;
 };
 
-export type CeruBusinessBoundary = {
-  userProfile: CeruUserProfile | null;
-  cloudPlaylists: CeruCloudPlaylist[];
-  selectedPlaylist: CeruCloudPlaylistDetail | null;
+export type ShuxiaBusinessBoundary = {
+  userProfile: ShuxiaUserProfile | null;
+  cloudPlaylists: ShuxiaCloudPlaylist[];
+  selectedPlaylist: ShuxiaCloudPlaylistDetail | null;
 };
 
-export const emptyBusinessBoundary: CeruBusinessBoundary = {
+export const emptyBusinessBoundary: ShuxiaBusinessBoundary = {
   userProfile: null,
   cloudPlaylists: [],
   selectedPlaylist: null,

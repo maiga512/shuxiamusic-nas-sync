@@ -1,5 +1,5 @@
 {
-  "name": "@maiga512/ceru-nas-sync-server",
+  "name": "@shuxia/nas-sync-server",
   "version": "0.3.2",
   "private": false,
   "type": "module",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@ceru/shared-contract": "file:../packages/shared-contract",
+    "@shuxia/shared-contract": "file:../packages/shared-contract",
     "better-sqlite3": "^12.9.0"
   },
   "devDependencies": {
@@ -22,8 +22,5 @@
   },
   "engines": {
     "node": ">=22 <23"
-  },
-  "description": "Self-hosted NAS playlist sync server for Ceru Music",
-  "author": "maiga512",
-  "license": "AGPL-3.0-only"
+  }
 }

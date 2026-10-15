@@ -1,15 +1,15 @@
 services:
-  ceru-nas-sync:
+  shuxia-nas-sync:
     build:
       context: ..
       dockerfile: nas-sync-server/Dockerfile
-    container_name: ceru-nas-sync
+    container_name: shuxia-nas-sync
     restart: unless-stopped
     environment:
-      CERU_SYNC_HOST: 0.0.0.0
-      CERU_SYNC_PORT: 31231
-      CERU_SYNC_DB_PATH: /data/ceru-sync.sqlite
-      CERU_SYNC_ADMIN_TOKEN: ${CERU_SYNC_ADMIN_TOKEN:?set CERU_SYNC_ADMIN_TOKEN in .env}
+      SHUXIA_SYNC_HOST: 0.0.0.0
+      SHUXIA_SYNC_PORT: 31231
+      SHUXIA_SYNC_DB_PATH: /data/shuxia-sync.sqlite
+      SHUXIA_SYNC_ADMIN_TOKEN: ${SHUXIA_SYNC_ADMIN_TOKEN:?set SHUXIA_SYNC_ADMIN_TOKEN in .env}
     ports:
       - "31231:31231"
     volumes:

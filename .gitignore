@@ -8,3 +8,7 @@ nas-sync-server/data
 nas-sync-server/.env
 npm-debug.log*
 yarn-error.log*
+# AI 部署凭据文件（含 SSH 主机/私钥路径/NAS 内网地址，绝不入库）
+AI_DEPLOY_ACCESS.md
+**/AI_DEPLOY_ACCESS.md
+*.bak

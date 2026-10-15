@@ -1,9 +1,9 @@
 # 树夏Music 同步服务器
 
-树夏Music 同步服务器（原名 Ceru Music NAS Sync）是树夏Music 的自部署多端同步方案，包含两个部分：
+树夏Music 同步服务器（原名 树夏Music 同步服务器）是树夏Music 的自部署多端同步方案，包含两个部分：
 
 - `nas-sync-server/`：部署在 NAS、服务器、软路由、Docker 面板上的同步服务端。
-- `plugins/ceru-nas-sync-service.js`：导入到树夏Music 桌面端的服务插件。
+- `plugins/shuxia-nas-sync-service.js`：导入到树夏Music 桌面端的服务插件。
 
 它用于把桌面端的歌单、歌单歌曲、收藏关系备份到你自己的 NAS，并支持多台设备通过同一个 NAS 服务进行多端同步。
 
@@ -50,6 +50,21 @@ ghcr.io/maiga512/shuxiamusic-nas-sync:latest
 
 > 旧镜像名 `ghcr.io/maiga512/ceru-music-nas-sync:latest` 仍然同步发布，老部署无需改动。
 
+## 从旧版本（Ceru Music NAS Sync）升级
+
+本项目原名 Ceru Music NAS Sync，环境变量、容器名、数据库文件名都叫 `ceru-*`。
+升级后**老部署不需要任何改动**，代码会自动兼容：
+
+| 项目 | 新名（推荐） | 旧名（继续兼容） |
+| --- | --- | --- |
+| 环境变量 | `SHUXIA_SYNC_HOST/PORT/DB_PATH/ADMIN_TOKEN` | `CERU_SYNC_*`（新名没设时自动读旧名） |
+| 数据库文件 | `shuxia-sync.sqlite` | `ceru-sync.sqlite`（旧文件存在就继续用，零迁移） |
+| 容器名 | `shuxia-nas-sync` | `ceru-nas-sync`（重新 `docker compose up -d` 后自动用新名） |
+| Docker 镜像 | `ghcr.io/maiga512/shuxiamusic-nas-sync` | `ghcr.io/maiga512/ceru-music-nas-sync`（两个名字都同步发布） |
+| 插件文件 | `plugins/shuxia-sync-service.js` | `plugins/ceru-nas-sync-service.js`（内容相同，老链接仍可用） |
+
+优先级：新环境变量 > 旧环境变量 > 默认值。旧数据库文件会被继续读取，不需要手动迁移。
+
 ## 功能
 
 - 自部署 NAS 同步服务，不使用公共云地址。
@@ -68,7 +83,7 @@ ghcr.io/maiga512/shuxiamusic-nas-sync:latest
 运行时用户、绑定码、歌单、收藏和同步记录保存在你部署机器上的 SQLite 数据库里，默认路径是：
 
 ```text
-nas-sync-server/data/ceru-sync.sqlite
+nas-sync-server/data/shuxia-sync.sqlite
 ```
 
 这些运行时数据不会提交到 GitHub。仓库里的 `.dockerignore` 和 `.gitignore` 已经忽略：
@@ -104,16 +119,16 @@ cd shuxiamusic-nas-sync/nas-sync-server
 cp .env.example .env
 ```
 
-编辑 `.env`，把 `CERU_SYNC_ADMIN_TOKEN` 改成你自己的长随机字符串：
+编辑 `.env`，把 `SHUXIA_SYNC_ADMIN_TOKEN` 改成你自己的长随机字符串：
 
 ```env
-CERU_SYNC_HOST=0.0.0.0
-CERU_SYNC_PORT=31231
-CERU_SYNC_DB_PATH=/data/ceru-sync.sqlite
-CERU_SYNC_ADMIN_TOKEN=change-this-admin-token
+SHUXIA_SYNC_HOST=0.0.0.0
+SHUXIA_SYNC_PORT=31231
+SHUXIA_SYNC_DB_PATH=/data/shuxia-sync.sqlite
+SHUXIA_SYNC_ADMIN_TOKEN=change-this-admin-token
 ```
 
-`CERU_SYNC_ADMIN_TOKEN` 只用于命令行重置管理员账号，不是插件登录码。
+`SHUXIA_SYNC_ADMIN_TOKEN` 只用于命令行重置管理员账号，不是插件登录码。
 
 ### 3. 启动服务
 
@@ -151,7 +166,7 @@ curl http://你的NAS地址:31231/health
 看到下面结果表示服务在线：
 
 ```json
-{"status":"ok","service":"ceru-nas-sync-server"}
+{"status":"ok","service":"shuxia-nas-sync-server"}
 ```
 
 ## NAS / 面板部署说明
@@ -166,16 +181,16 @@ curl http://你的NAS地址:31231/health
 宿主机端口: 31231
 数据目录: /data
 环境变量:
-  CERU_SYNC_HOST=0.0.0.0
-  CERU_SYNC_PORT=31231
-  CERU_SYNC_DB_PATH=/data/ceru-sync.sqlite
-  CERU_SYNC_ADMIN_TOKEN=你自己的长随机字符串
+  SHUXIA_SYNC_HOST=0.0.0.0
+  SHUXIA_SYNC_PORT=31231
+  SHUXIA_SYNC_DB_PATH=/data/shuxia-sync.sqlite
+  SHUXIA_SYNC_ADMIN_TOKEN=你自己的长随机字符串
 ```
 
 数据卷示例：
 
 ```text
-宿主机目录 /你的路径/ceru-nas-sync/data  ->  容器目录 /data
+宿主机目录 /你的路径/shuxia-nas-sync/data  ->  容器目录 /data
 ```
 
 各面板的对应位置：
@@ -215,25 +230,25 @@ http://你的NAS地址:31231/admin
 插件文件在仓库里：
 
 ```text
-plugins/ceru-nas-sync-service.js
+plugins/shuxia-nas-sync-service.js
 ```
 
 GitHub 原始下载地址：
 
 ```text
-https://raw.githubusercontent.com/maiga512/shuxiamusic-nas-sync/main/plugins/ceru-nas-sync-service.js
+https://raw.githubusercontent.com/maiga512/shuxiamusic-nas-sync/main/plugins/shuxia-nas-sync-service.js
 ```
 
 Gitee 原始下载地址（国内更快）：
 
 ```text
-https://gitee.com/songsong2020/shuxiamusic-nas-sync/raw/main/plugins/ceru-nas-sync-service.js
+https://gitee.com/songsong2020/shuxiamusic-nas-sync/raw/main/plugins/shuxia-nas-sync-service.js
 ```
 
 在树夏Music 桌面端：
 
 ```text
-设置 -> 插件 -> 添加插件 -> 澜音插件 -> 本地导入 -> 选择 ceru-nas-sync-service.js
+设置 -> 插件 -> 添加插件 -> 澜音插件 -> 本地导入 -> 选择 shuxia-nas-sync-service.js
 ```
 
 插件配置：
@@ -284,23 +299,23 @@ server {
 }
 ```
 
-不建议反代到子路径，例如 `/ceru-sync`，因为插件和后台接口默认使用 `/admin`、`/auth/pair`、`/sync`、`/me` 等根路径。
+不建议反代到子路径，例如 `/shuxia-sync`，因为插件和后台接口默认使用 `/admin`、`/auth/pair`、`/sync`、`/me` 等根路径。
 
 ## 找回管理员账号或密码
 
-如果忘记 Web 管理后台密码，可以用 `.env` 里的 `CERU_SYNC_ADMIN_TOKEN` 重置：
+如果忘记 Web 管理后台密码，可以用 `.env` 里的 `SHUXIA_SYNC_ADMIN_TOKEN` 重置：
 
 ```bash
 curl -X POST http://你的NAS地址:31231/admin/reset-admin \
   -H "Content-Type: application/json" \
-  -H "x-admin-token: 你的CERU_SYNC_ADMIN_TOKEN" \
+  -H "x-admin-token: 你的SHUXIA_SYNC_ADMIN_TOKEN" \
   -d '{"username":"admin","password":"新的管理员密码"}'
 ```
 
 也可以进入容器离线重置：
 
 ```bash
-docker compose exec ceru-nas-sync node src/resetAdmin.ts admin 新的管理员密码
+docker compose exec shuxia-nas-sync node src/resetAdmin.ts admin 新的管理员密码
 ```
 
 这个操作只重置管理后台账号，不会删除用户、绑定码、歌单、收藏或同步数据。

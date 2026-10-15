@@ -10,8 +10,8 @@ import {
 
 test('music-source identity is stable across spacing and case', () => {
   assert.equal(
-    musicSourceIdentityKey('  Demo Plugin ', 'Ceru Music'),
-    musicSourceIdentityKey('demo plugin', 'ceru music'),
+    musicSourceIdentityKey('  Demo Plugin ', '树夏Music'),
+    musicSourceIdentityKey('demo plugin', '树夏music'),
   );
   assert.equal(musicSourceIdentityKey('Demo', ''), 'music-source:demo:_');
 });

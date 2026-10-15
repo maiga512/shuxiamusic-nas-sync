@@ -15,7 +15,7 @@ const song = (id: string) => ({
 });
 
 const withDatabase = (run: (database: SyncDatabase, userId: string, playlistId: string) => void) => {
-  const directory = mkdtempSync(join(tmpdir(), 'ceru-sync-test-'));
+  const directory = mkdtempSync(join(tmpdir(), 'shuxia-sync-test-'));
   const database = new SyncDatabase(join(directory, 'sync.sqlite'));
   const user = database.createUser({username: `test-${Date.now()}`, passwordHash: 'hash'});
   const playlist = database.createPlaylist(user.id, {
@@ -115,7 +115,7 @@ test('source-prefixed track ids collapse to one canonical song', () => {
 });
 
 test('waiting for sync events releases immediately when aborted', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'ceru-sync-abort-test-'));
+  const directory = mkdtempSync(join(tmpdir(), 'shuxia-sync-abort-test-'));
   const database = new SyncDatabase(join(directory, 'sync.sqlite'));
   const user = database.createUser({username: `abort-${Date.now()}`, passwordHash: 'hash'});
   const controller = new AbortController();
@@ -134,7 +134,7 @@ test('waiting for sync events releases immediately when aborted', async () => {
 });
 
 test('a write from one device wakes another device long poll immediately', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'ceru-sync-wakeup-test-'));
+  const directory = mkdtempSync(join(tmpdir(), 'shuxia-sync-wakeup-test-'));
   const database = new SyncDatabase(join(directory, 'sync.sqlite'));
   const user = database.createUser({username: `wakeup-${Date.now()}`, passwordHash: 'hash'});
   const playlist = database.createPlaylist(user.id, {
