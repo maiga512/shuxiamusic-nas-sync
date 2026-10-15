@@ -1,12 +1,11 @@
 import {resolve} from 'node:path';
-import {SYNC_HOST, SYNC_PORT, resolveDbPath} from './env.ts';
 
 import {SyncDatabase} from './database.ts';
 import {createSyncServer} from './http.ts';
 
-const port = SYNC_PORT();
-const host = SYNC_HOST();
-const dbPath = resolve(resolveDbPath('./data'));
+const port = Number(process.env.SHUXIA_SYNC_PORT || 31231);
+const host = process.env.SHUXIA_SYNC_HOST || '0.0.0.0';
+const dbPath = resolve(process.env.SHUXIA_SYNC_DB_PATH || process.env.SHUXIA_SYNC_DB || './data/shuxia-sync.sqlite');
 const displayHost = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
 
 const database = new SyncDatabase(dbPath);

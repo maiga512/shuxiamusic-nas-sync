@@ -14,9 +14,9 @@ RUN npm install --omit=dev --ignore-scripts \
 COPY nas-sync-server/src ./src
 COPY nas-sync-server/tsconfig.json ./
 
-ENV SHUXIA_SYNC_HOST=0.0.0.0
-ENV SHUXIA_SYNC_PORT=31231
-ENV SHUXIA_SYNC_DB_PATH=/data/shuxia-sync.sqlite
+ENV CERU_SYNC_HOST=0.0.0.0
+ENV CERU_SYNC_PORT=31231
+ENV CERU_SYNC_DB_PATH=/data/ceru-sync.sqlite
 
 VOLUME ["/data"]
 EXPOSE 31231

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 
-const baseUrl = String(process.env.CERU_SYNC_TEST_BASE_URL || 'http://127.0.0.1:31231').replace(/\/$/, '')
-const adminToken = String(process.env.CERU_SYNC_ADMIN_TOKEN || '')
-assert.ok(adminToken, 'CERU_SYNC_ADMIN_TOKEN is required')
+const baseUrl = String(process.env.SHUXIA_SYNC_TEST_BASE_URL || 'http://127.0.0.1:31231').replace(/\/$/, '')
+const adminToken = String(process.env.SHUXIA_SYNC_ADMIN_TOKEN || '')
+assert.ok(adminToken, 'SHUXIA_SYNC_ADMIN_TOKEN is required')
 
 const results = []
 let testUserId = ''

@@ -1,5 +1,4 @@
 import {createServer, type IncomingMessage, type ServerResponse} from 'node:http';
-import {SYNC_ADMIN_TOKEN} from './env.ts';
 import {URL} from 'node:url';
 
 import {renderAdminPage} from './adminPage.ts';
@@ -173,7 +172,7 @@ const getAdminUsername = (database: SyncDatabase) => database.getSetting(ADMIN_U
 
 const requireAdmin = (database: SyncDatabase, request: IncomingMessage) => {
   const token = getAdminToken(request);
-  const envAdminToken = SYNC_ADMIN_TOKEN();
+  const envAdminToken = process.env.SHUXIA_SYNC_ADMIN_TOKEN || '';
   if (envAdminToken && token === envAdminToken) return;
 
   if (!token || !database.authenticateAdminToken(token)) {
@@ -200,7 +199,7 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
     GET: () => ({status: 'ok', service: 'shuxia-nas-sync-server'}),
   },
   '/version': {
-    GET: () => ({name: '@shuxia/nas-sync-server', version: '0.3.2'}),
+    GET: () => ({name: '@shuxia/nas-sync-server', version: '0.1.0'}),
   },
   '/auth/register': {
     POST: async ({body}) => {
@@ -362,7 +361,7 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
   '/admin/reset-admin': {
     POST: async ({request, body}) => {
       const token = getAdminToken(request);
-      const envAdminToken = SYNC_ADMIN_TOKEN();
+      const envAdminToken = process.env.SHUXIA_SYNC_ADMIN_TOKEN || '';
       if (!envAdminToken || token !== envAdminToken) {
         const error = new Error('需要使用 SHUXIA_SYNC_ADMIN_TOKEN 重置管理员账号');
         Object.assign(error, {statusCode: 401});
@@ -419,7 +418,7 @@ const createRouter = (database: SyncDatabase): Record<string, Partial<Record<str
     GET: ({request}) => {
       requireAdmin(database, request);
       return {
-        service: {status: 'ok', name: '@shuxia/nas-sync-server', version: '0.3.2'},
+        service: {status: 'ok', name: '@shuxia/nas-sync-server', version: '0.1.0'},
         admin: {username: getAdminUsername(database)},
         users: database.listUserSummaries(),
       };
@@ -778,7 +777,7 @@ export const createSyncServer = ({database}: ServerConfig) => {
           const page = await database.waitForSyncEvents(
             auth.user.id,
             cursor,
-            25_000,
+            15_000,
             abortController.signal,
           );
           if (page.events.length > 0) {

@@ -125,7 +125,7 @@ async function requestNas(config, endpoint, options) {
   }
 
   return new Promise((resolve, reject) => {
-    cerumusic.request(
+    (typeof shuxiaMusic !== 'undefined' ? shuxiaMusic : cerumusic).request(
       baseUrl + endpoint,
       {
         method: opts.method || 'GET',

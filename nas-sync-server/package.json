@@ -1,7 +1,7 @@
 {
   "name": "@shuxia/nas-sync-server",
-  "version": "0.3.2",
-  "private": false,
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
